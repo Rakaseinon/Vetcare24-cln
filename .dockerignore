@@ -1,0 +1,13 @@
+.git
+.github
+.env
+*.db
+__pycache__/
+.pytest_cache/
+htmlcov/
+# docs/ pesado fuera de la imagen; pero docs/TRAZABILIDAD.md y docs/api/ SÍ entran: la imagen de pruebas los necesita
+docs/analisis/
+docs/evidencia/
+docs/architecture/diagramas/
+docs/*.pdf
+docs/*.html

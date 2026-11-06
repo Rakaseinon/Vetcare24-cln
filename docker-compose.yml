@@ -1,0 +1,55 @@
+# DB (PostgreSQL) + App (FastAPI) + Tests (pytest con cobertura).
+#   docker compose up --build            -> API en http://localhost:8000/docs
+#   docker compose run --rm tests        -> corre la suite completa contra SQLite en memoria
+#   docker compose --profile pgtests run --rm tests-pg -> mismas pruebas de integración contra PostgreSQL real
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vetcare}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vetcare}
+      POSTGRES_DB: ${POSTGRES_DB:-vetcare24}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vetcare} -d ${POSTGRES_DB:-vetcare24}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      target: app
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vetcare}:${POSTGRES_PASSWORD:-vetcare}@db:5432/${POSTGRES_DB:-vetcare24}
+      SEED_ON_START: ${SEED_ON_START:-true}
+      ENVIRONMENT: docker
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  tests:
+    build:
+      context: .
+      target: test
+    environment:
+      ENVIRONMENT: test
+
+  tests-pg:
+    profiles: ["pgtests"]
+    build:
+      context: .
+      target: test
+    environment:
+      ENVIRONMENT: test
+      TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-vetcare}:${POSTGRES_PASSWORD:-vetcare}@db:5432/${POSTGRES_DB:-vetcare24}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

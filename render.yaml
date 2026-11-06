@@ -1,0 +1,24 @@
+# Blueprint de Render: PostgreSQL gratuito + servicio web con Docker. Swagger UI queda en <url>/docs
+databases:
+  - name: vetcare24-db
+    plan: free
+    databaseName: vetcare24
+    user: vetcare
+
+services:
+  - type: web
+    name: vetcare24-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vetcare24-db
+          property: connectionString
+      - key: SEED_ON_START
+        value: "true"
+      - key: ENVIRONMENT
+        value: production
