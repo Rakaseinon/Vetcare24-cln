@@ -1,0 +1,30 @@
+### RN-04  POST /consultas/{id}/recetas  (penicilina, paciente alérgico)
+HTTP 409
+{"codigo":"AlergiaBloqueoError","mensaje":"BLOQUEO DE SEGURIDAD (RN-04): el paciente es alérgico a 'penicilina'"}
+
+### RN-04 excepción: con justificación bajo cédula
+HTTP 201
+
+### RN-01  PUT /consultas/{id}/nota  (nota ya firmada)
+HTTP 409
+{"codigo":"NotaInmutableError","mensaje":"RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"}
+
+### RN-01  POST /consultas/{id}/enmiendas
+HTTP 201
+
+### RN-06  alta médica (paso 1)
+PENDIENTE_VALIDACION_CRUZADA | apto_para_egreso = False
+### RN-06  liquidación (paso 2)
+EGRESO_CONCLUIDO | apto_para_egreso = True
+### jaula JP-01 libre:
+True
+
+### Paquete de datos  GET /ordenes/VET-O001
+{'id': 'VET-O001', 'estado': 'SOLICITADA', 'total': '7587.00', 'puede_procesarse': True, 'elegible_beneficio_referencia': False, 'acciones_permitidas': ['aprobar', 'cancelar']}
+### transición inválida: completar desde SOLICITADA
+HTTP 409
+{"codigo":"InvalidStateTransition","mensaje":"OrdenServicio: la acción 'completar' no está permitida en el estado SOLICITADA"}
+
+### US02  cirugía mayor
+{'tipo': 'CIRUGIA', 'sala': 'QUIR-01', 'duracion_min': 90, 'estado': 'PROGRAMADA'}
+### RNF-03  recepción pide expediente clínico: HTTP 403

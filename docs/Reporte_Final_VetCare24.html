@@ -1,0 +1,296 @@
+<!doctype html><html lang='es'><head><meta charset='utf-8'><style>
+@page{size:Letter;margin:22mm 18mm 20mm 18mm}
+body{font-family:'DejaVu Sans',Arial,sans-serif;font-size:10pt;line-height:1.45;color:#1b2430}
+h1{font-size:19pt;color:#0d4f4a;border-bottom:3px solid #0d4f4a;padding-bottom:4px;margin-top:26px;page-break-after:avoid}
+h2{font-size:13pt;color:#0d4f4a;margin-top:18px;page-break-after:avoid} h3{font-size:11pt;margin-top:12px;page-break-after:avoid}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:8.8pt;page-break-inside:auto} tr{page-break-inside:avoid}
+th{background:#0d4f4a;color:#fff;text-align:left;padding:4px 6px} td{border:1px solid #cfd8dc;padding:4px 6px;vertical-align:top}
+code{font-family:'DejaVu Sans Mono',monospace;font-size:8.3pt;background:#eef3f3;padding:0 2px}
+pre{font-family:'DejaVu Sans Mono',monospace;font-size:7pt;background:#101820;color:#d7e3e0;padding:8px;white-space:pre-wrap;word-break:break-word;border-radius:4px}
+img{max-width:100%} .fig{text-align:center;margin:8px 0;page-break-inside:avoid} .cap{font-size:8.5pt;color:#566;margin-top:2px}
+.cover{text-align:center;padding-top:70mm;page-break-after:always} .cover h1{border:none;font-size:28pt;margin:0}
+.kpi{display:flex;gap:8px;margin:10px 0} .kpi div{flex:1;border:1px solid #cfd8dc;border-radius:6px;padding:8px;text-align:center}
+.kpi b{display:block;font-size:17pt;color:#0d4f4a} .note{background:#fff7e0;border-left:4px solid #e0a800;padding:6px 10px;margin:8px 0}
+.pb{page-break-before:always}
+@page land{size:Letter landscape;margin:16mm 14mm 16mm 14mm} .land{page:land} .land h1{margin-top:0}
+table.gh{table-layout:fixed} table.gh td{font-size:8pt;word-break:break-word} table.gh code{font-size:7.2pt}
+</style></head><body>
+
+
+<h1>1. Resumen ejecutivo</h1>
+<p>VetCare 24 es una clínica y hospital veterinario con atención 24/7. A partir del BRD, las 15 historias de usuario con Gherkin, el BPMN y el diseño DDD elaborados en las unidades 2 y 3,
+se construyó una <b>API REST</b> en Python (FastAPI) con arquitectura limpia y <b>Domain Model</b> (ADR-001). Las seis reglas de negocio del BRD (RN-01…RN-06) viven en el dominio como
+objetos que se protegen solos; se implementaron los patrones <b>Specification</b> (AND/OR/NOT), <b>State Machine</b> y <b>Domain Events</b>, persistencia relacional (SQLite/PostgreSQL),
+contrato OpenAPI/Swagger, pruebas unitarias y de integración, contenedores Docker y CI/CD en GitHub Actions.</p>
+<div class="kpi"><div><b>15 / 15</b>historias de usuario</div><div><b>6 / 6</b>reglas RN-01…06</div><div><b>343</b>pruebas automáticas</div><div><b>99.0 %</b>cobertura (dominio 100 %)</div><div><b>38</b>rutas OpenAPI</div></div>
+<p>Además se resolvió el <b>paquete de datos</b> del caso (40 tutores, 20 servicios, 60 órdenes, 120 casos de prueba, 20 transiciones) y se validó con un <b>oráculo independiente</b> que no reutiliza el código del dominio.</p>
+
+
+<h1>2. Análisis del negocio (BRD)</h1>
+<p>Fuente: BRD del equipo (U2), refinado en <code>docs/BRD.md</code>; los originales en PDF están en <code>docs/analisis/originales/</code>.</p>
+<h2>2.1 Contexto y problema</h2>
+<p><b>Modelo operativo.</b> VetCare 24 es una clínica y centro hospitalario veterinario con atención ininterrumpida (24/7): consultas generales y de especialidad, medicina preventiva, cirugía, laboratorio y hospitalización. Opera con cuenta familiar: un tutor puede tener varias mascotas y cada animal necesita un expediente individual, trazable e independiente.</p>
+<p><b>Problema (AS-IS).</b> Registros físicos y digitales fragmentados: expedientes duplicados; consulta lenta de antecedentes y alergias en urgencias; calendarios de vacunación sin recordatorios; agenda con duraciones estáticas y sin carril de emergencia.</p>
+<p><b>Visión (TO-BE).</b> Plataforma centralizada con expediente unificado tutor–mascotas, agenda por servicio, admisión inmediata de emergencias, notas inmutables con enmiendas auditadas y motor de recordatorios de vacunación.</p>
+<h2>2.2 Stakeholders y actores</h2>
+<table><tr><th>Actor</th><th>Responsabilidad</th><th>Necesidad principal</th><th>Rol en la API</th></tr>
+<tr><td>Recepción</td><td>Admisión, cobros, agenda, primer contacto</td><td>Buscar rápido sin duplicar fichas; agendar según la duración real</td><td><code>RECEPCION</code></td></tr>
+<tr><td>Médico veterinario</td><td>Diagnóstico, prescripción, cirugía, altas</td><td>Historial al instante, notas SOAP inmutables, alertas de alergia</td><td><code>VETERINARIO</code></td></tr>
+<tr><td>Personal clínico / enfermería</td><td>Cuidados en piso y monitoreo</td><td>Capturar signos vitales en rondas periódicas</td><td><code>ENFERMERIA</code></td></tr>
+<tr><td>Propietario / tutor</td><td>Responsable legal y financiero</td><td>Recordatorios de refuerzos; indicaciones de tratamiento</td><td>Receptor de notificaciones</td></tr>
+<tr><td>Director médico / administrador</td><td>Supervisión, auditoría, gestión operativa</td><td>Auditar enmiendas; monitorear ocupación y cumplimiento de citas</td><td><code>DIRECTOR</code></td></tr></table>
+<h2>2.3 Alcance</h2>
+<table><tr><th>Dentro del alcance</th><th>Fuera del alcance</th></tr>
+<tr><td>Gestión de identidad (tutor, mascotas, microchip) · Agenda inteligente por servicio (15/30/45/90–120 min) · Admisión de urgencia · Expediente clínico con bloqueo tras firma y enmiendas · Seguridad farmacológica por alergias · Módulo profiláctico (lote obligatorio, refuerzos 21/28/365 d, avisos) · Hospitalización 24/7 con bitácora y alta cruzada · RBAC por perfiles</td>
+<td>Facturación electrónica ante entidades tributarias · Nómina y asistencia · Tienda virtual · Consultas por videollamada</td></tr></table>
+<h2>2.4 Reglas de negocio</h2>
+<table><tr><th>ID</th><th>Regla (BRD)</th><th>Dónde se hace cumplir</th></tr>
+<tr><td><b>RN-01</b></td><td>Inmutabilidad médica: la nota firmada se congela; solo se corrige con Nota de Enmienda (autor, fecha, motivo)</td><td><code>Consulta._asegurar_editable</code>, <code>anexar_enmienda</code></td></tr>
+<tr><td><b>RN-02</b></td><td>Prioridad de triage rojo: salta lista de espera y trámites administrativos</td><td><code>Consulta.admitir_urgencia</code></td></tr>
+<tr><td><b>RN-03</b></td><td>Trazabilidad de biológicos: lote y fabricante obligatorios antes de guardar una vacuna</td><td><code>RegistroVacuna.aplicar</code></td></tr>
+<tr><td><b>RN-04</b></td><td>Bloqueo por alergia registrada al recetar el mismo principio activo (excepción con justificación bajo cédula, ADR-002)</td><td><code>ServicioValidacionAlergias</code></td></tr>
+<tr><td><b>RN-05</b></td><td>El expediente pertenece al animal: la transferencia conserva el historial y reasigna contacto y cobro</td><td><code>Paciente.transferir_a</code></td></tr>
+<tr><td><b>RN-06</b></td><td>Validación cruzada de alta: liberar la jaula exige alta médica firmada y cuenta/precuenta liquidada</td><td><code>ServicioAltaHospitalaria</code>, <code>MAQUINA_HOSPITALIZACION</code></td></tr></table>
+<h2>2.5 Requerimientos funcionales y no funcionales</h2>
+<table><tr><th>ID</th><th>Requerimiento</th><th>Implementación / verificación</th></tr>
+<tr><td>RF-01</td><td>Búsqueda predictiva por teléfono, mascota, código o microchip</td><td><code>GET /pacientes/buscar</code> · prueba US01/US12</td></tr>
+<tr><td>RF-02</td><td>Hoja de triaje: peso, temperatura, motivo</td><td><code>POST /pacientes/{id}/triaje</code></td></tr>
+<tr><td>RF-03</td><td>Citas con bloqueo automático por servicio</td><td><code>ServicioAgenda</code>, <code>POST /citas</code></td></tr>
+<tr><td>RF-04</td><td>Cálculo automático del próximo refuerzo</td><td><code>RegistroVacuna.aplicar</code></td></tr>
+<tr><td>RF-05</td><td>Recordatorio 48 h antes del refuerzo</td><td><code>RefuerzoPorNotificarSpec</code>, <code>POST /recordatorios/procesar</code></td></tr>
+<tr><td>RF-06</td><td>Bitácora de constantes cada 2–4 h</td><td><code>Hospitalizacion.registrar_constantes</code></td></tr>
+<tr><td>RNF-01</td><td>Expediente en menos de 3 s</td><td>prueba automatizada que mide el tiempo</td></tr>
+<tr><td>RNF-02</td><td>Disponibilidad 24/7</td><td><code>/health</code>, <code>HEALTHCHECK</code>, despliegue gestionado</td></tr>
+<tr><td>RNF-03</td><td>Acceso por roles; recepción sin detalle clínico</td><td><code>security.requiere</code>; pruebas 401/403</td></tr>
+<tr><td>RNF-04</td><td>Vistas táctiles</td><td>No aplica a un backend REST (ver sección 12)</td></tr></table>
+<h2>2.6 Criterios de éxito (KPIs)</h2>
+<p>Duplicados &lt; 1 % · +40 % de retorno a refuerzos · ingreso de código rojo en &lt; 15 s · 100 % de bitácoras con intervalos ≤ 4 h. El sistema provee los datos y las reglas (<code>GET /reportes/operativo</code>, <code>LecturaVencidaSpec</code>); la medición real requiere operación en producción.</p>
+
+<h1>3. Historias de usuario y criterios de aceptación (Gherkin)</h1>
+<p>Las 15 historias del equipo (5 módulos) con su escenario Gherkin, el componente que lo implementa y la prueba que lo verifica.</p>
+<table class="gh"><colgroup><col style="width:6%"><col style="width:27%"><col style="width:40%"><col style="width:27%"></colgroup><tr><th>US</th><th>Historia</th><th>Criterio de aceptación (Gherkin)</th><th>Implementación y prueba</th></tr><tr><td><b>US01</b></td><td>Como Recepcionista, quiero registrar los datos del cliente y vincular múltiples mascotas a su ficha, para consolidar su historial bajo una misma cuenta familiar.</td><td><b>Escenario:</b> Registro exitoso de mascota asociada<br><b>Dado</b> que el recepcionista ingresó los datos válidos del propietario<br><b>Cuando</b> completa nombre, especie, raza, peso y fecha de nacimiento de la mascota<br><b>Entonces</b> el sistema guarda la mascota vinculada al ID del cliente y genera su número de expediente único</td><td><code>PacienteService.registrar_mascota</code><br><code>POST /pacientes</code><br><small>Prueba: <code>test_paciente_tutor.py::test_tutor_requiere_contacto_y_canal_valido</code></small></td></tr><tr><td><b>US12</b></td><td>Como Recepcionista / Veterinario, quiero buscar pacientes por nombre, teléfono del dueño, microchip o código, para evitar la duplicación de fichas.</td><td><b>Escenario:</b> Coincidencia predictiva de expedientes<br><b>Dado</b> que el recepcionista escribe el apellido del dueño y la raza en el buscador<br><b>Cuando</b> existen coincidencias previas registradas<br><b>Entonces</b> el sistema despliega una lista de coincidencias para verificar antes de crear un expediente nuevo</td><td><code>PacienteRepository.buscar</code><br><code>GET /pacientes/buscar</code><br><small>Prueba: <code>test_api_clinica.py::test_us01_registro_y_busqueda_por_microchip_y_nombre</code></small></td></tr><tr><td><b>US02</b></td><td>Como Recepcionista, quiero agendar citas bloqueando lapsos según el tipo de servicio, para evitar solapamientos y sobrecupos en las salas.</td><td><b>Escenario:</b> Bloqueo de horario según servicio<br><b>Dado</b> que un cliente solicita una cita de «Cirugía Mayor»<br><b>Cuando</b> el recepcionista selecciona dicho servicio en el calendario<br><b>Entonces</b> el sistema reserva un bloque mínimo continuo de 90 minutos y asigna quirófano disponible</td><td><code>ServicioAgenda / Cita</code><br><code>POST /citas</code><br><small>Prueba: <code>test_agenda.py::test_bloqueo_segun_servicio</code></small></td></tr><tr><td><b>US03</b></td><td>Como Personal clínico, quiero admitir un paciente en estado crítico sin cita previa, para estabilizarlo de inmediato sin retrasos administrativos.</td><td><b>Escenario:</b> Admisión de urgencia crítica<br><b>Dado</b> que arriba un paciente con traumatismo severo<br><b>Cuando</b> el usuario activa el botón «Admisión de Emergencia»<br><b>Entonces</b> el sistema notifica al veterinario en turno y abre un expediente temporal de intervención inmediata</td><td><code>Consulta.admitir_urgencia</code><br><code>POST /urgencias</code><br><small>Prueba: <code>test_consulta.py::test_urgencia_no_exige_datos_administrativos_y_es_rojo</code></small></td></tr><tr><td><b>US04</b></td><td>Como Asistente veterinario, quiero registrar el peso, temperatura y alergias reportadas al llegar, para actualizar el estado físico del animal previo a la auscultación.</td><td><b>Escenario:</b> Detección de alerta por alergia<br><b>Dado</b> que el asistente ingresa «Penicilina» en el campo de alergias<br><b>Cuando</b> guarda los signos vitales de la visita<br><b>Entonces</b> el sistema muestra un indicador permanente de «Alerta de Alergia» en el encabezado del paciente</td><td><code>Paciente.registrar_triaje</code><br><code>POST /pacientes/{id}/triaje</code><br><small>Prueba: <code>test_paciente_tutor.py::test_triaje_actualiza_peso_y_alergias</code></small></td></tr><tr><td><b>US05</b></td><td>Como Médico Veterinario, quiero documentar el diagnóstico, anamnesis y tratamiento en una nota clínica, para certificar formalmente la atención brindada.</td><td><b>Escenario:</b> Cierre de nota clínica inmutable<br><b>Dado</b> que el veterinario completó la nota de la consulta<br><b>Cuando</b> presiona «Firmar y Cerrar Nota»<br><b>Entonces</b> el registro se bloquea contra edición y se marca con firma, fecha y cédula del profesional</td><td><code>Consulta.firmar_y_cerrar</code><br><code>POST …/nota/firmar</code><br><small>Prueba: <code>test_consulta.py::test_firmar_congela_y_registra_cedula</code></small></td></tr><tr><td><b>US06</b></td><td>Como Médico Veterinario, quiero recetar fármacos dosificados según peso del paciente, para emitir una receta clara y libre de riesgos toxicológicos.</td><td><b>Escenario:</b> Bloqueo por prescripción de sustancia alérgena<br><b>Dado</b> que la mascota tiene registrada alergia activa a un principio activo<br><b>Cuando</b> el médico intenta agregar dicho fármaco a la receta digital<br><b>Entonces</b> el sistema interrumpe la acción con una advertencia crítica de contraindicación</td><td><code>ServicioValidacionAlergias</code><br><code>POST …/recetas</code><br><small>Prueba: <code>test_consulta.py::test_rn04_bloquea_alergeno_y_no_modifica_receta</code></small></td></tr><tr><td><b>US07</b></td><td>Como Sistema, quiero calcular la fecha del próximo refuerzo al aplicar una vacuna, para mantener actualizado el calendario preventivo.</td><td><b>Escenario:</b> Creación de cita profiláctica sugerida<br><b>Dado</b> que el veterinario registra la aplicación de la vacuna «Quíntuple Canina»<br><b>Cuando</b> se valida el lote y la dosis<br><b>Entonces</b> el sistema agenda un recordatorio de refuerzo exactamente 21 días después</td><td><code>RegistroVacuna.aplicar</code><br><code>POST /vacunas</code><br><small>Prueba: <code>test_profilaxis.py::test_refuerzo_exacto</code></small></td></tr><tr><td><b>US08</b></td><td>Como Propietario, quiero recibir avisos por WhatsApp/correo previo a las vacunas de mi mascota, para cumplir en tiempo con su cuadro preventivo.</td><td><b>Escenario:</b> Despacho automatizado de notificación<br><b>Dado</b> que faltan 48 horas para la fecha teórica de un refuerzo<br><b>Cuando</b> el proceso programado evalúa las fechas pendientes<br><b>Entonces</b> se despacha un mensaje al canal preferido del dueño</td><td><code>RefuerzoPorNotificarSpec</code><br><code>POST /recordatorios/procesar</code><br><small>Prueba: <code>test_api_clinica.py::test_us08_recordatorio_48h_antes_se_envia_una_sola_vez</code></small></td></tr><tr><td><b>US09</b></td><td>Como Médico Veterinario, quiero transferir un paciente a hospitalización indicando cama y protocolo, para asegurar monitoreo continuo.</td><td><b>Escenario:</b> Asignación de jaula/box hospitalario<br><b>Dado</b> que se dictaminó orden de internamiento<br><b>Cuando</b> el médico selecciona una jaula desocupada y carga el plan de fluidoterapia<br><b>Entonces</b> el estado del paciente cambia a «Hospitalizado» y se activa la hoja de enfermería 24/7</td><td><code>ServicioIngresoHospitalario</code><br><code>POST /hospitalizaciones</code><br><small>Prueba: <code>test_hospitalizacion.py::test_ingreso_asigna_jaula_compatible</code></small></td></tr><tr><td><b>US10</b></td><td>Como Enfermero veterinario, quiero volcar las lecturas periódicas de constantes vitales en la bitácora, para monitorear tendencias y evolución.</td><td><b>Escenario:</b> Registro de signos fuera de rango<br><b>Dado</b> que el paciente hospitalizado se encuentra bajo monitoreo periódico<br><b>Cuando</b> el enfermero captura una frecuencia cardíaca crítica anormal<br><b>Entonces</b> el sistema emite una alerta de signos fuera de rango</td><td><code>Hospitalizacion.registrar_constantes</code><br><code>POST …/constantes</code><br><small>Prueba: <code>test_hospitalizacion.py::test_ventana_4h_estable_y_2h_critico</code></small></td></tr><tr><td><b>US11</b></td><td>Como Médico Veterinario, quiero emitir la orden de alta con indicaciones de cuidado en casa, para permitir que el dueño proceda al retiro del animal.</td><td><b>Escenario:</b> Validación de alta integral<br><b>Dado</b> que el médico cargó la nota de egreso y la firma de alta<br><b>Cuando</b> recepción valida que los insumos y días de hospitalización fueron auditados<br><b>Entonces</b> el estado pasa a «Alta Médica / egreso concluido» y se libera la jaula</td><td><code>ServicioAltaHospitalaria</code><br><code>POST …/alta-medica · …/liquidacion</code><br><small>Prueba: <code>test_hospitalizacion.py::test_alta_requiere_ambas_confirmaciones_sin_importar_orden</code></small></td></tr><tr><td><b>US13</b></td><td>Como Director Médico, quiero añadir notas aclaratorias sobre registros antiguos sellados, para enmendar omisiones sin destruir el historial original.</td><td><b>Escenario:</b> Anexo de nota de aclaración<br><b>Dado</b> un expediente con una consulta cerrada<br><b>Cuando</b> el médico agrega una «Nota de Enmienda» justificada<br><b>Entonces</b> el sistema vincula la aclaración manteniendo intacta la versión previa</td><td><code>Consulta.anexar_enmienda</code><br><code>POST …/enmiendas</code><br><small>Prueba: <code>test_consulta.py::test_enmienda_solo_sobre_nota_firmada_y_conserva_original</code></small></td></tr><tr><td><b>US14</b></td><td>Como Médico Veterinario, quiero solicitar perfiles hematológicos y anexar los resultados al expediente, para correlacionar estudios diagnósticos.</td><td><b>Escenario:</b> Adjuntar reporte de laboratorio<br><b>Dado</b> que el laboratorio externo remitió el archivo de un hemograma<br><b>Cuando</b> el veterinario sube el archivo al expediente<br><b>Entonces</b> el sistema asocia el documento a la consulta y alerta al médico tratante</td><td><code>Consulta.adjuntar_resultado</code><br><code>POST …/laboratorio</code><br><small>Prueba: <code>test_consulta.py::test_us14_solicitar_y_adjuntar_resultado_emite_alerta_al_medico</code></small></td></tr><tr><td><b>US15</b></td><td>Como Administrador de la clínica, quiero consultar métricas de ocupación de jaulas y vacunas aplicadas semanalmente, para planificar compras y personal.</td><td><b>Escenario:</b> Extracción de KPIs semanales<br><b>Dado</b> que el administrador selecciona el rango de los últimos 7 días<br><b>Cuando</b> solicita la generación del reporte<br><b>Entonces</b> la plataforma entrega la tasa de ocupación, citas canceladas y vacunas aplicadas</td><td><code>ReporteService.operativo</code><br><code>GET /reportes/operativo</code><br><small>Prueba: <code>test_api_clinica.py::test_reporte_operativo_solo_director</code></small></td></tr></table>
+
+<div class="land"><h1>4. Proceso de negocio (BPMN)</h1>
+
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/architecture/diagramas/bpmn_proceso.png" style="height:158mm;max-width:100%;object-fit:contain"><div class="cap">Figura 1. BPMN del proceso central de VetCare 24 (redibujado a partir del BPMN del equipo)</div></div></div>
+<p>Proceso central de atención, internamiento y profilaxis, en tres carriles. Los objetos de datos DO_01…DO_04 corresponden a la ficha de admisión, el expediente electrónico, la receta con avisos y la bitácora hospitalaria. Las actividades sombreadas son las que materializan reglas de negocio.</p>
+<table><tr><th>Actividad BPMN</th><th>Regla / historia</th><th>Componente</th></tr>
+<tr><td>Botón «Admisión Urgencia» (Código Rojo)</td><td>RN-02 · US03</td><td><code>Consulta.admitir_urgencia</code> → <code>POST /urgencias</code></td></tr>
+<tr><td>Búsqueda unificada + triaje (DO_01)</td><td>US12 · US04</td><td><code>PacienteRepository.buscar</code>, <code>Paciente.registrar_triaje</code></td></tr>
+<tr><td>Asignación dinámica en agenda</td><td>US02 · RF-03</td><td><code>ServicioAgenda</code>, <code>SalaLibreSpec</code></td></tr>
+<tr><td>Prescripción con validación contra alergias (DO_03)</td><td>RN-04 · US06</td><td><code>ServicioValidacionAlergias</code></td></tr>
+<tr><td>Firmar y cerrar nota SOAP (DO_02)</td><td>RN-01 · US05 · US13</td><td><code>Consulta.firmar_y_cerrar</code>, <code>NotaEnmienda</code></td></tr>
+<tr><td>Aplicación de biológico → refuerzo y recordatorio</td><td>RN-03 · US07 · US08</td><td><code>RegistroVacuna.aplicar</code>, <code>RefuerzoPorNotificarSpec</code></td></tr>
+<tr><td>Asignación de jaula y fluidoterapia</td><td>US09</td><td><code>ServicioIngresoHospitalario</code></td></tr>
+<tr><td>Monitoreo cada 2–4 h (DO_04)</td><td>RF-06 · US10</td><td><code>Hospitalizacion.registrar_constantes</code>, <code>LecturaVencidaSpec</code></td></tr>
+<tr><td>Nota de egreso, auditoría de insumos y liquidación</td><td>RN-06 · US11</td><td><code>ServicioAltaHospitalaria</code>, <code>MAQUINA_HOSPITALIZACION</code></td></tr></table>
+
+<h1>5. Glosario de dominio</h1>
+<p>Los 20 términos del glosario del equipo y el elemento del modelo donde viven (lenguaje ubicuo: el código usa los mismos nombres).</p>
+<table><tr><th>#</th><th>Término</th><th>Definición</th><th>En el modelo</th></tr><tr><td>1</td><td><b>Propietario (Tutor)</b></td><td>Persona legalmente responsable de la mascota y de las obligaciones financieras de la atención.</td><td><code>Tutor</code> (<code>tutor.py</code>)</td></tr><tr><td>2</td><td><b>Paciente (Mascota)</b></td><td>Animal registrado que recibe servicios preventivos, terapéuticos o quirúrgicos.</td><td><code>Paciente</code>, <code>TutorResponsable</code></td></tr><tr><td>3</td><td><b>Expediente Clínico Digital</b></td><td>Conjunto cronológico de notas, diagnósticos, resultados y tratamientos de un paciente.</td><td><code>Consulta</code> + <code>GET /pacientes/{id}/expediente</code></td></tr><tr><td>4</td><td><b>Triage Veterinario</b></td><td>Clasificación rápida por gravedad (Rojo = emergencia, Amarillo = urgencia, Verde = rutina).</td><td><code>NivelTriage</code>, <code>HojaTriaje</code></td></tr><tr><td>5</td><td><b>Anamnesis</b></td><td>Información retrospectiva que el veterinario obtiene del propietario sobre el motivo de consulta.</td><td><code>NotaSOAP.subjetivo</code></td></tr><tr><td>6</td><td><b>Signos Vitales</b></td><td>Variables fisiológicas objetivas: temperatura, frecuencia cardíaca y respiratoria, peso.</td><td><code>ConstantesVitales</code>, <code>Peso</code></td></tr><tr><td>7</td><td><b>Nota de Evolución</b></td><td>Asiento médico obligatorio con método SOAP en cada encuentro clínico.</td><td><code>NotaSOAP</code>, <code>EstadoNota</code></td></tr><tr><td>8</td><td><b>Nota de Enmienda</b></td><td>Addendum oficial que corrige o detalla un registro cerrado sin vulnerar su inmutabilidad.</td><td><code>NotaEnmienda</code> (RN-01)</td></tr><tr><td>9</td><td><b>Calendario Profiláctico</b></td><td>Cronograma de inmunizaciones y desparasitaciones.</td><td><code>RegistroVacuna</code>, <code>ProgramacionRefuerzo</code></td></tr><tr><td>10</td><td><b>Refuerzo (Booster)</b></td><td>Dosis subsecuente de un biológico tras un intervalo específico.</td><td><code>IntervaloRefuerzo</code>, <code>EsquemaRefuerzo</code> (21/28/365 d)</td></tr><tr><td>11</td><td><b>Lote de Biológico</b></td><td>Código del fabricante registrado para trazabilidad y farmacovigilancia.</td><td><code>LoteBiologico</code>, <code>MarcaVacuna</code> (RN-03)</td></tr><tr><td>12</td><td><b>Prescripción Terapéutica</b></td><td>Instrucción formal con fármaco, dosis por kg, vía, frecuencia y duración.</td><td><code>ItemReceta</code>, <code>MedicamentoDosificado</code></td></tr><tr><td>13</td><td><b>Alerta de Alergia</b></td><td>Mecanismo que bloquea o advierte la administración de sustancias incompatibles.</td><td><code>Alergeno</code>, <code>ServicioValidacionAlergias</code> (RN-04)</td></tr><tr><td>14</td><td><b>Hospitalización</b></td><td>Internamiento para observación continua, fluidoterapia o terapia intensiva.</td><td><code>Hospitalizacion</code>, <code>Jaula</code></td></tr><tr><td>15</td><td><b>Bitácora de Monitoreo</b></td><td>Registro periódico (2–4 h) de signos vitales, ingesta y medicación.</td><td><code>LecturaBitacora</code>, <code>LecturaVencidaSpec</code></td></tr><tr><td>16</td><td><b>Alta Médica</b></td><td>Dictamen del veterinario tratante que certifica la superación del criterio de internamiento.</td><td><code>ServicioAltaHospitalaria</code>, <code>AltaMedicaAutorizadaEvent</code> (RN-06)</td></tr><tr><td>17</td><td><b>Cita Diferenciada</b></td><td>Reserva cuya duración y recursos varían según el procedimiento.</td><td><code>Cita</code>, <code>ServicioAgenda</code></td></tr><tr><td>18</td><td><b>Consentimiento Informado</b></td><td>Documento firmado por el propietario que autoriza intervenciones o riesgos.</td><td>Fuera de alcance (ver sección 12)</td></tr><tr><td>19</td><td><b>Registro Duplicado</b></td><td>Una misma mascota o tutor con más de un identificador, dispersando su historial.</td><td><code>MicrochipCode</code> único + <code>PacienteRepository.buscar</code></td></tr><tr><td>20</td><td><b>KPI Clínico</b></td><td>Métrica de gestión: ocupación de jaulas, retención de vacunas, tiempos de espera.</td><td><code>ReporteService.operativo</code> (US15)</td></tr></table>
+
+<h1>6. Trazabilidad</h1>
+<p>Cada regla, historia, escenario Gherkin y elemento BPMN se enlaza con su clase de dominio, su código y sus pruebas en <code>docs/TRAZABILIDAD.md</code> (24 filas), generado desde una tabla de datos. La prueba <code>test_trazabilidad.py</code> falla si algún archivo o símbolo citado ya no existe o si el documento está desactualizado, de modo que la matriz no puede desalinearse del código.</p>
+<table><tr><th>Cadena</th><th>Ejemplo (RN-04)</th></tr>
+<tr><td>BRD → User Story → Gherkin</td><td>RN-04 → US06 → «Bloqueo por prescripción de sustancia alérgena»</td></tr>
+<tr><td>BPMN</td><td>Prescripción farmacológica (validación activa contra alergias, DO_03)</td></tr>
+<tr><td>Dominio</td><td><code>ServicioValidacionAlergias</code>, <code>AlergenoCoincideSpec</code>, <code>BloqueoAlergiaDisparadoEvent</code></td></tr>
+<tr><td>Código</td><td><code>services.py::ConsultaService</code> · <code>POST /consultas/{id}/recetas</code> (409)</td></tr>
+<tr><td>Pruebas</td><td>unitarias del servicio de alergias + integración del endpoint (409 / 201 con justificación)</td></tr></table>
+
+<h1>7. Arquitectura</h1>
+<h2>7.1 Decisión: Domain Model (ADR-001)</h2>
+<p>Se comparó Transaction Script, Table Module y Domain Model. Se eligió <b>Domain Model (DDD)</b> porque las reglas RN-01…RN-06 son invariantes entrelazadas con ciclo de vida de estados: en un modelo rico el agregado las hace cumplir y se prueban sin base de datos ni servidor web.</p>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/evidencia/arq.png" style="width:100%"><div class="cap">Figura 2. Capas y regla de dependencia (api → application → domain ← infrastructure)</div></div>
+<h2>7.2 Agregados y patrones</h2>
+<table><tr><th>Agregado (raíz)</th><th>Invariantes</th></tr>
+<tr><td>Paciente</td><td>microchip único; alergias sin duplicar; transferencia conserva historial</td></tr>
+<tr><td>Consulta (SOAP, enmiendas, receta, estudios)</td><td>nota firmada inmutable; urgencia sin trámites; resultados de laboratorio se anexan sin editar la nota</td></tr>
+<tr><td>Hospitalizacion + Jaula</td><td>lecturas cada 4 h (2 h en crítico); alta cruzada</td></tr>
+<tr><td>RegistroVacuna</td><td>lote y marca obligatorios; refuerzo 21/28/365 días</td></tr>
+<tr><td>Cita</td><td>duración por servicio (15/30/45/90–120 min), sala sin solapes, cancelación tardía &lt; 4 h</td></tr>
+<tr><td>OrdenServicio (paquete de datos)</td><td><code>puede_procesarse</code>, beneficio de referencia, máquina de estados</td></tr></table>
+<p>Los agregados se referencian solo por identificador (<code>paciente_id</code>, <code>tutor_id</code>), de modo que cada transacción modifica un único agregado.</p>
+<ul><li><b>Specification</b> con <code>&amp;</code>, <code>|</code>, <code>~</code> y <code>reasons()</code>; p. ej. <code>puede_procesarse = TutorActivo &amp; OrdenConLineas &amp; OrdenAutorizada</code> y <code>beneficio = Preferente &amp; TotalMínimo &amp; ~Promoción</code>.</li>
+<li><b>State Machine</b> por tabla (estado × acción → estado) para órdenes, hospitalización y citas; una transición inválida produce <code>InvalidStateTransition</code> (HTTP 409).</li>
+<li><b>Domain Events</b> publicados <i>después</i> del commit (ADR-006); suscriptor activo: alerta al médico al recibir un resultado de laboratorio.</li>
+<li><b>Repository + Unit of Work</b>; <b>Service Layer</b> delgada (solo orquesta).</li></ul>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/evidencia/estados.png" style="width:92%"><div class="cap">Figura 3. Máquina de estados de Hospitalizacion (RN-06)</div></div>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/evidencia/orden.png" style="width:92%"><div class="cap">Figura 4. Máquina de estados de OrdenServicio (paquete de datos)</div></div>
+<h2>7.3 Patrones de diseño: selección y justificación</h2>
+<table><tr><th>Patrón</th><th>Problema del negocio que resuelve</th><th>Dónde está</th><th>Alternativa descartada</th></tr><tr><td><b>Domain Model (DDD)</b></td><td>Seis reglas entrelazadas con ciclo de vida (RN-01…06) que no deben filtrarse a BD ni UI.</td><td><code>src/domain</code>: agregados con sus Value Objects</td><td>Transaction Script y Table Module (ADR-001)</td></tr><tr><td><b>Specification (AND/OR/NOT)</b></td><td>Reglas compuestas del BRD y del paquete de datos que deben explicar <i>por qué</i> fallan.</td><td><code>specifications.py</code>, <code>agenda.py</code>; <code>puede_procesarse = TutorActivo &amp; OrdenConLineas &amp; OrdenAutorizada</code></td><td><code>if</code> anidados en servicios (ADR-005)</td></tr><tr><td><b>State Machine</b></td><td>Orden, hospitalización y cita tienen estados con transiciones válidas e inválidas (RN-06).</td><td><code>StateMachine</code> en <code>common.py</code>; tablas en cada agregado</td><td>Banderas booleanas sueltas; librería externa (ADR-005)</td></tr><tr><td><b>Domain Events</b></td><td>Reaccionar a hechos (resultado de laboratorio, bloqueo por alergia) sin acoplar módulos.</td><td><code>events.py</code> (23 eventos); <code>InMemoryEventBus</code></td><td>Llamadas directas; broker externo (ADR-006)</td></tr><tr><td><b>Repository + Unit of Work</b></td><td>Persistir agregados completos y atómicos sin que el dominio conozca SQLAlchemy.</td><td><code>repositories.py</code>, <code>uow.py</code></td><td>ORM con tablas hijas (ADR-003)</td></tr><tr><td><b>Service Layer</b></td><td>Orquestar casos de uso (transacción, eventos) sin reglas de negocio.</td><td><code>src/application/services.py</code></td><td>Lógica en los controladores</td></tr><tr><td><b>Domain Service</b></td><td>Reglas que involucran varios agregados (alergia vs receta; alta cruzada).</td><td><code>servicios.py</code></td><td>Métodos en un agregado que conocería a otro</td></tr></table>
+<h2>7.4 Diagramas de clases del dominio (UML)</h2>
+<p>El modelo se presenta por agregado (rombo lleno = composición dentro del agregado; flecha punteada = referencia por identificador a otro agregado). Todas las raíces heredan de <code>AggregateRoot</code>, que registra los eventos de dominio.</p>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/architecture/diagramas/clases_c1_paciente.png" style="width:100%"><div class="cap">Figura 5. Tutor y Paciente con sus Value Objects (RN-05)</div></div>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/architecture/diagramas/clases_c2_consulta.png" style="width:100%"><div class="cap">Figura 6. Consulta: nota SOAP, receta, enmiendas y laboratorio (RN-01, RN-02, RN-04)</div></div>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/architecture/diagramas/clases_c3_hospital.png" style="width:62%"><div class="cap">Figura 7. Hospitalización y Jaula (RN-06)</div></div>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/architecture/diagramas/clases_c4_otros.png" style="width:100%"><div class="cap">Figura 8. Vacunas (RN-03), Citas y Órdenes de servicio</div></div>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/architecture/diagramas/clases_c5_spec.png" style="width:92%"><div class="cap">Figura 9. Jerarquía de Specification</div></div>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/architecture/diagramas/clases_c6_estado.png" style="width:80%"><div class="cap">Figura 10. State Machine y servicios de dominio</div></div>
+<h2>7.5 Principios SOLID</h2>
+<table><tr><th>Principio</th><th>Aplicación en el código</th><th>Verificación</th></tr>
+<tr><td><b>S</b> Responsabilidad única</td><td>Un agregado por conjunto de invariantes; un servicio de dominio por regla (<code>ServicioValidacionAlergias</code>, <code>ServicioIngresoHospitalario</code>, <code>ServicioAltaHospitalaria</code>); servicios de aplicación solo orquestan; controladores sin lógica</td><td>pruebas unitarias por pieza</td></tr>
+<tr><td><b>O</b> Abierto/cerrado</td><td>Una regla nueva es una <code>Specification</code> nueva compuesta con <code>&amp;</code>, <code>|</code>, <code>~</code>; un estado nuevo es una fila de la tabla de <code>StateMachine</code>; un agregado nuevo es una subclase de <code>DocRepository</code></td><td><code>test_specification</code>, <code>test_state_machine</code></td></tr>
+<tr><td><b>L</b> Sustitución de Liskov</td><td><code>And/Or/NotSpecification</code> sustituyen a <code>Specification</code>; cualquier <code>Notificador</code> o <code>EventBus</code> cumple el puerto; SQLite y PostgreSQL son intercambiables</td><td>suite completa en ambos motores; <code>test_arquitectura</code></td></tr>
+<tr><td><b>I</b> Segregación de interfaces</td><td>Puertos pequeños y separados: <code>EventBus</code>, <code>Notificador</code>, <code>UnitOfWork</code></td><td><code>src/application/ports.py</code></td></tr>
+<tr><td><b>D</b> Inversión de dependencias</td><td><code>application</code> depende de puertos; <code>infrastructure</code> los implementa; <code>api/container.py</code> es la única raíz de composición</td><td><code>test_arquitectura</code> analiza los <code>import</code> de todo <code>src/</code> y falla si una capa depende hacia afuera</td></tr></table>
+<p>Detalle con fragmentos de código en <code>docs/architecture/SOLID.md</code>. Límites reconocidos: <code>UnitOfWork</code> expone sus repositorios sin tipar uno a uno, y algunos servicios de aplicación son grandes.</p>
+<h2>7.6 Registros de decisión (ADR)</h2>
+<p>Cada ADR documenta contexto, decisión, alternativas consideradas y consecuencias.</p>
+<table><tr><th>ADR</th><th>Decisión</th></tr>
+<tr><td>001</td><td>Domain Model / DDD con 4 agregados, servicios de dominio y Service Layer delgada (del equipo, U3)</td></tr>
+<tr><td>002</td><td>Bloqueo por alergia con excepción justificada bajo cédula (RN-04)</td></tr>
+<tr><td>003</td><td>Persistencia: un agregado = una fila (columnas indexadas + documento JSON/JSONB)</td></tr>
+<tr><td>004</td><td>RBAC demostrativo por encabezado <code>X-Rol</code> (RNF-03)</td></tr>
+<tr><td>005</td><td>Specification y State Machine explícitas</td></tr>
+<tr><td>006</td><td>Eventos de dominio publicados solo tras el commit</td></tr></table>
+
+<h1>8. Implementación</h1>
+<table><tr><th>Aspecto</th><th>Detalle</th></tr>
+<tr><td>Stack</td><td>Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, pytest + pytest-cov, PostgreSQL 16 / SQLite</td></tr>
+<tr><td>Estructura</td><td><code>src/domain</code> · <code>src/application</code> · <code>src/infrastructure</code> · <code>src/api</code> · <code>tests</code> · <code>docs</code></td></tr>
+<tr><td>Persistencia</td><td>Una tabla por agregado: columnas para consultar + columna <code>doc</code> (JSONB en PostgreSQL) serializada por un codec propio; el dominio no conoce el ORM</td></tr>
+<tr><td>API</td><td>38 rutas (39 operaciones) en Swagger UI en español: cada recurso explica qué hace, su regla y los roles que pueden usarlo; los cuerpos traen ejemplos válidos y el rol DIRECTOR entra precargado; errores 400 (dato inválido) · 404 · 409 (regla de negocio / estado) · 422 (contrato); OpenAPI en <code>/openapi.json</code>, Swagger UI en <code>/docs</code></td></tr>
+<tr><td>Seguridad</td><td>RBAC por rol (RECEPCION, VETERINARIO, ENFERMERIA, DIRECTOR) con encabezado <code>X-Rol</code> — <b>demostrativo, no es autenticación</b></td></tr>
+<tr><td>Configuración</td><td>12-Factor: <code>DATABASE_URL</code>, <code>SEED_ON_START</code>, <code>DATA_DIR</code>, <code>ENVIRONMENT</code>, <code>PORT</code>; <code>.env.example</code> sin secretos</td></tr>
+<tr><td>Contenedores</td><td><code>Dockerfile</code> multi-etapa (base / test / app, usuario sin privilegios, <code>HEALTHCHECK</code>); <code>docker-compose.yml</code> con servicios <i>db</i> (PostgreSQL), <i>app</i> y <i>tests</i></td></tr>
+<tr><td>CI/CD</td><td>GitHub Actions: pruebas contra PostgreSQL de servicio, cobertura ≥ 80 %, exportación de OpenAPI, build de imagen, pruebas en Compose y <i>deploy hook</i> a Render</td></tr>
+<tr><td>Despliegue</td><td><code>render.yaml</code> (Blueprint: PostgreSQL + servicio web Docker); Swagger UI en <code>/docs</code></td></tr></table>
+
+<h1>9. Producción: Docker Compose, 12-Factor, CI/CD y despliegue</h1>
+<table><tr><th>Requisito del PIA</th><th>Cómo se cumple</th><th>Evidencia</th></tr>
+<tr><td>Docker Compose para DB + App + Tests</td><td><code>docker-compose.yml</code>: servicio <code>db</code> (PostgreSQL 16 con healthcheck), <code>app</code> (API en :8000, espera a la BD sana) y <code>tests</code> (pytest con cobertura; perfil <code>tests-pg</code> contra PostgreSQL). Imagen multi-etapa (base / test / app) con usuario sin privilegios y <code>HEALTHCHECK</code></td><td><code>docker compose up --build</code> · <code>docker compose run --rm tests</code></td></tr>
+<tr><td>Variables de entorno (12-Factor)</td><td>Toda la configuración sale del entorno: <code>DATABASE_URL</code>, <code>SEED_ON_START</code>, <code>DATA_DIR</code>, <code>ENVIRONMENT</code>, <code>PORT</code>. <code>.env.example</code> sin secretos; <code>.env</code> excluido por <code>.gitignore</code> y <code>.dockerignore</code></td><td><code>.env.example</code>, <code>src/infrastructure/config.py</code></td></tr>
+<tr><td>Pipeline CI/CD activo</td><td>GitHub Actions (<code>.github/workflows/ci.yml</code>): pytest contra un PostgreSQL de servicio con umbral de cobertura ≥ 80 %, exportación del OpenAPI, build de la imagen, pruebas dentro de Compose y deploy hook de Render</td><td>pestaña <i>Actions</i> del repositorio</td></tr>
+<tr><td>Despliegue funcional</td><td><code>render.yaml</code> (Blueprint): base PostgreSQL + servicio web Docker con <code>SEED_ON_START=true</code> y <code>/health</code> como health check</td><td>URL pública (portada y README)</td></tr>
+<tr><td>Swagger UI / OpenAPI activo</td><td>Swagger UI en <code>/docs</code> (en español, rol precargado y formulario por campos) y contrato en <code>/openapi.json</code>, exportado a <code>docs/api/openapi.json</code> en cada CI</td><td>Figuras 11 y 12</td></tr></table>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/evidencia/swagger.png" style="width:70%"><div class="cap">Figura 11. Swagger UI en <code>/docs</code>: guía de uso y recorrido sugerido (captura local; sustituir por la del despliegue)</div></div>
+<div class="fig"><img src="file:///home/claude/work/vetcare24-cln/docs/evidencia/swagger_formulario.png" style="width:66%"><div class="cap">Figura 12. Una operación con formulario por campos, ejecutada con éxito (201): los datos viajan en la petición real</div></div>
+<h1>10. Paquete de datos VetCare 24</h1>
+<p>Los CSV (40 tutores, 20 servicios, 60 órdenes con 117 líneas de detalle, 120 casos, 20 transiciones) se cargan con <code>SEED_ON_START=true</code> y se ejecutan contra el dominio real con <code>scripts/ejecutar_casos_prueba.py</code>.</p>
+<table><tr><th>Regla evaluada</th><th>Resultado sobre las 60 órdenes</th></tr>
+<tr><td><code>validar_operacion</code> (tutor activo AND ≥ 1 línea AND autorizada)</td><td>43 válidas · 17 inválidas</td></tr>
+<tr><td><code>evaluar_beneficio</code> (preferente AND total ≥ 1 500 AND NOT promoción)</td><td>9 aplican · 51 no aplican</td></tr>
+<tr><td>Transiciones (20)</td><td>aprobar/cancelar válidos; <code>completar</code> y <code>saltar_estado</code> desde SOLICITADA → 409; <code>repetir_aprobacion</code> → 409 en la 2.ª aprobación</td></tr></table>
+<p><b>Oráculo independiente.</b> <code>test_oraculo_paquete_datos.py</code> recalcula cada total y cada veredicto únicamente con <code>csv</code> y <code>Decimal</code>, sin importar <code>src.domain</code>, y los compara contra las respuestas de la API: 120 casos + 20 transiciones. Así el código no se valida contra sí mismo.</p>
+<div class="note">El <code>LEEME.txt</code> del paquete indica que sus reglas son ilustrativas y que las diferencias con el BRD deben documentarse. Ver <code>docs/DIFERENCIAS_PAQUETE_DATOS.md</code>
+(p. ej. interpretación de estados terminales, seis órdenes históricas con un servicio deshabilitado, dos órdenes sin líneas).</div>
+
+<h1>11. Evidencia de pruebas</h1>
+<table><tr><th>Medición</th><th>Resultado</th></tr>
+<tr><td>Pruebas automáticas</td><td><b>343 pasan</b> en SQLite en memoria y en PostgreSQL 16 real (<code>TEST_DATABASE_URL</code>)</td></tr>
+<tr><td>Cobertura total</td><td><b>99.0 %</b> (requerido ≥ 80 %)</td></tr>
+<tr><td>Por capa</td><td>dominio <b>100 %</b> · API 99.0 % · infraestructura 99.0 % · aplicación 96.3 %</td></tr>
+<tr><td>Tipos</td><td>unitarias de dominio sin BD · integración vía API REST · oráculo del paquete de datos · trazabilidad verificada</td></tr></table>
+<p>Hallazgo relevante: al ejecutar la suite contra PostgreSQL real se detectó que SQLAlchemy 2 interpreta <code>postgresql://</code> como el driver psycopg v3 mientras el proyecto usa psycopg2; habría fallado el despliegue.
+Se corrigió con <code>normalizar_url</code> (que además convierte <code>postgres://</code> de Render) y quedó cubierto por pruebas.</p>
+<h2>Cobertura por módulo (<code>pytest --cov=src</code>)</h2>
+<pre>src/__init__.py                          0      0   100%
+src/api/__init__.py                      0      0   100%
+src/api/container.py                    38      0   100%
+src/api/docs.py                         58      3    95%
+src/api/main.py                         33      0   100%
+src/api/routes.py                      129      2    98%
+src/api/schemas.py                     225      1    99%
+src/api/security.py                     19      0   100%
+src/application/__init__.py              0      0   100%
+src/application/ports.py                17      0   100%
+src/application/services.py            301     13    96%
+src/application/views.py                29      0   100%
+src/domain/__init__.py                   0      0   100%
+src/domain/agenda.py                    97      0   100%
+src/domain/common.py                    90      0   100%
+src/domain/consulta.py                 160      0   100%
+src/domain/events.py                   105      0   100%
+src/domain/hospitalizacion.py          139      0   100%
+src/domain/orden_servicio.py            76      0   100%
+src/domain/paciente.py                 113      0   100%
+src/domain/profilaxis.py                60      0   100%
+src/domain/servicios.py                 40      0   100%
+src/domain/specifications.py            72      0   100%
+src/domain/tutor.py                     26      0   100%
+src/infrastructure/__init__.py           0      0   100%
+src/infrastructure/codec.py             54      2    96%
+src/infrastructure/config.py            14      0   100%
+src/infrastructure/db.py                25      1    96%
+src/infrastructure/event_bus.py         20      0   100%
+src/infrastructure/models.py            66      0   100%
+src/infrastructure/notifier.py           9      0   100%
+src/infrastructure/repositories.py     119      1    99%
+src/infrastructure/seed.py              44      0   100%
+src/infrastructure/uow.py               38      0   100%
+TOTAL                                 2216     23    99%
+</pre>
+<p>Reproducible con <code>docker compose run --rm tests</code> o <code>pytest --cov=src --cov-fail-under=80</code>; el pipeline de GitHub Actions ejecuta el mismo comando con ese umbral.</p>
+<h2>Ejecución real de las reglas clave contra la API</h2>
+<pre>### RN-04  POST /consultas/{id}/recetas  (penicilina, paciente alérgico)
+HTTP 409
+{&quot;codigo&quot;:&quot;AlergiaBloqueoError&quot;,&quot;mensaje&quot;:&quot;BLOQUEO DE SEGURIDAD (RN-04): el paciente es alérgico a &#x27;penicilina&#x27;&quot;}
+
+### RN-04 excepción: con justificación bajo cédula
+HTTP 201
+
+### RN-01  PUT /consultas/{id}/nota  (nota ya firmada)
+HTTP 409
+{&quot;codigo&quot;:&quot;NotaInmutableError&quot;,&quot;mensaje&quot;:&quot;RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda&quot;}
+
+### RN-01  POST /consultas/{id}/enmiendas
+HTTP 201
+
+### RN-06  alta médica (paso 1)
+PENDIENTE_VALIDACION_CRUZADA | apto_para_egreso = False
+### RN-06  liquidación (paso 2)
+EGRESO_CONCLUIDO | apto_para_egreso = True
+### jaula JP-01 libre:
+True
+
+### Paquete de datos  GET /ordenes/VET-O001
+{&#x27;id&#x27;: &#x27;VET-O001&#x27;, &#x27;estado&#x27;: &#x27;SOLICITADA&#x27;, &#x27;total&#x27;: &#x27;7587.00&#x27;, &#x27;puede_procesarse&#x27;: True, &#x27;elegible_beneficio_referencia&#x27;: False, &#x27;acciones_permitidas&#x27;: [&#x27;aprobar&#x27;, &#x27;cancelar&#x27;]}
+### transición inválida: completar desde SOLICITADA
+HTTP 409
+{&quot;codigo&quot;:&quot;InvalidStateTransition&quot;,&quot;mensaje&quot;:&quot;OrdenServicio: la acción &#x27;completar&#x27; no está permitida en el estado SOLICITADA&quot;}
+
+### US02  cirugía mayor
+{&#x27;tipo&#x27;: &#x27;CIRUGIA&#x27;, &#x27;sala&#x27;: &#x27;QUIR-01&#x27;, &#x27;duracion_min&#x27;: 90, &#x27;estado&#x27;: &#x27;PROGRAMADA&#x27;}
+### RNF-03  recepción pide expediente clínico: HTTP 403
+</pre>
+
+<h1>12. Diferencias, supuestos y limitaciones</h1>
+<ul><li><b>Autenticación:</b> <code>X-Rol</code> es solo demostrativo; en producción se sustituye por JWT/OIDC en un único punto (<code>security.requiere</code>).</li>
+<li><b>Notificaciones</b> (WhatsApp/correo) simuladas; el mensaje de recordatorio no incluye enlace para confirmar o reagendar (requiere cliente web).</li>
+<li><b>Laboratorio:</b> se registra metadato y huella SHA-256 del archivo, no el binario.</li>
+<li><b>Rangos de signos vitales</b> (temperatura 37.5–39.5 °C, FC 60–180, FR 10–40) y el esquema de refuerzo por edad son supuestos técnicos <b>pendientes de validación clínica</b> con el Director Médico.</li>
+<li><b>US13:</b> el Gherkin menciona «consulta cerrada hace más de 24 h»; el BRD/ADR no fija plazo, por lo que se permite la enmienda en cualquier momento posterior a la firma.</li>
+<li><b>Fuera de alcance:</b> consentimiento informado, lista de espera de cancelaciones, pago en línea de estudios externos, inventario de biológicos, interfaz gráfica y alertas sonoras.</li>
+<li><b>KPIs de negocio</b> (duplicados &lt; 1 %, +40 % de retorno, código rojo &lt; 15 s) son métricas de operación en producción; el sistema provee los datos pero no pueden demostrarse con datos ficticios.</li></ul>
+
+<h1>13. Conclusiones</h1>
+<p>El Domain Model resultó adecuado: las reglas más delicadas (alergias, inmutabilidad, alta cruzada) quedaron concentradas en pocos métodos de dominio, probados al 100 % sin infraestructura,
+y la capa de aplicación se mantuvo como orquestadora. Specification y State Machine hicieron que las reglas del paquete de datos fueran explicables (cada rechazo nombra la regla incumplida) y verificables con un oráculo independiente.
+Probar sobre PostgreSQL real, y no solo SQLite, evitó un fallo de despliegue. La trazabilidad verificada por pruebas reduce el riesgo de documentación desalineada con el código.</p>
+<p><b>Trabajo futuro:</b> autenticación real; adaptador de mensajería; almacenamiento de archivos; consentimiento informado y lista de espera; validación clínica de rangos; cliente web/tablet responsivo (RNF-04); observabilidad.</p>
+
+<h2>Referencias</h2>
+<p>FIME UANL. (2026). <i>Caso 04: VetCare 24</i> (Unidad 2: Análisis de Requerimientos de Negocio). · Fowler, M. (2002). <i>Patterns of Enterprise Application Architecture</i>. Addison-Wesley. · Evans, E. (2003). <i>Domain-Driven Design</i>. Addison-Wesley.
+· Documentos del equipo (U2/U3) en <code>docs/analisis/originales/</code>.</p>
+
+<h1>Anexo A. Cumplimiento de los requisitos del PIA</h1>
+<table><tr><th>Criterio del documento del profesor</th><th>Evidencia en el repositorio</th><th>Sección</th></tr>
+<tr><td>BRD completo y refinado de U2/U3</td><td><code>docs/BRD.md</code> + originales en <code>docs/analisis/originales/</code></td><td>2</td></tr>
+<tr><td>≥ 15 User Stories con Gherkin, BPMN y glosario, con trazabilidad</td><td>15 historias; BPMN; 20 términos; <code>docs/TRAZABILIDAD.md</code></td><td>3, 4, 5, 6</td></tr>
+<tr><td>Modelo/diagramas DDD (entidades, VO, agregados, servicios, eventos)</td><td>Diagramas de clases por agregado; 23 eventos de dominio; servicios de dominio</td><td>7.2, 7.4</td></tr>
+<tr><td>UML consistente con la solución</td><td><code>docs/architecture/diagramas/*.png|.mmd</code> (derivados del código)</td><td>7.4</td></tr>
+<tr><td>Patrones justificados</td><td>Tabla problema → patrón → alternativa descartada</td><td>7.3</td></tr>
+<tr><td>SOLID demostrable</td><td><code>docs/architecture/SOLID.md</code> + prueba de regla de dependencia (AST)</td><td>7.5</td></tr>
+<tr><td>ADRs: contexto, decisión, alternativas, consecuencias</td><td><code>docs/architecture/adr/ADR-001…006</code></td><td>7.6</td></tr>
+<tr><td>Estructura del repositorio (docs/, src/ en 4 capas, tests/, .github/workflows, docker-compose.yml, .env.example, README)</td><td>Presentes tal como lo indica el documento</td><td>8</td></tr>
+<tr><td>Código funcional: DDD + Specification + State Machine + API REST</td><td><code>src/domain</code>, <code>src/application</code>, <code>src/api</code></td><td>7, 8</td></tr>
+<tr><td>Persistencia/DB, OpenAPI/Swagger, casos de uso integrales</td><td>SQLite/PostgreSQL; 38 rutas; recorrido en <code>/docs</code></td><td>8, 9</td></tr>
+<tr><td>Pruebas unitarias e integración con cobertura ≥ 80 %</td><td>343 pruebas; 99.0 %</td><td>11</td></tr>
+<tr><td>CI/CD activo en <code>.github/workflows/</code></td><td><code>ci.yml</code></td><td>9</td></tr>
+<tr><td>Docker Compose reproducible (DB + App + Tests)</td><td><code>docker-compose.yml</code>, <code>Dockerfile</code></td><td>9</td></tr>
+<tr><td>Variables de entorno + despliegue + Swagger en producción</td><td><code>.env.example</code>, <code>render.yaml</code>, <code>/docs</code></td><td>9</td></tr>
+<tr><td>Demo en vivo y defensa técnica</td><td><code>docs/GUIA_DEFENSA.md</code> y presentación de apoyo</td><td>—</td></tr>
+<tr><td>Historial de commits del equipo</td><td>Repositorio GitHub (commits de los tres integrantes)</td><td>Portada</td></tr></table>
+
+</body></html>

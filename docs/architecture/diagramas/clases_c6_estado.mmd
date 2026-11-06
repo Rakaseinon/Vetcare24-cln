@@ -1,0 +1,20 @@
+classDiagram
+    direction LR
+    class StateMachine~S~ {
+        +fire(estado, accion) S
+        +permitidas(estado) list
+        +tabla() list
+    }
+    class OrdenServicio
+    class Hospitalizacion
+    class Cita
+    class ServicioValidacionAlergias { +prescribir() RN-04 }
+    class ServicioIngresoHospitalario { +ingresar() US09 }
+    class ServicioAltaHospitalaria { +procesar() RN-06 }
+    class ServicioAgenda { +agendar() US02 }
+    OrdenServicio ..> StateMachine : MAQUINA_ORDEN
+    Hospitalizacion ..> StateMachine : MAQUINA_HOSPITALIZACION
+    Cita ..> StateMachine : MAQUINA_CITA
+    ServicioAltaHospitalaria ..> Hospitalizacion : orquesta
+    ServicioIngresoHospitalario ..> Hospitalizacion : crea
+    ServicioAgenda ..> Cita : crea

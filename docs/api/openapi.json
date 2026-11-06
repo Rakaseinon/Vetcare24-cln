@@ -1,0 +1,5010 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "VetCare 24 API",
+    "description": "\nAPI REST de **VetCare 24**, clínica y hospital veterinario 24/7 (PIA de Componentes de Lógica de Negocios, FIME-UANL, Equipo 4).\nCada recurso aplica una regla del negocio definida en el BRD, las User Stories y el BPMN (**RN-01 … RN-06**).\n\n## Cómo usar cada operación (3 pasos)\n1. **Abre** una operación haciendo clic en su barra de color (por ejemplo `POST /tutores`).\n2. **Llena el formulario**: un cuadro por dato (nombre, teléfono, etc.), todos marcados en **azul** y ya con un ejemplo válido. Si la operación pide un `id` en *Parámetros*, pégalo ahí: es el `id` que devolvió el paso anterior. Luego pulsa **▶ Ejecutar**.\n3. **Lee el resultado** en *Respuesta del servidor*, justo debajo: código **2xx** = funcionó; **4xx** = algo falló y el mensaje dice qué. Lo que aparece más abajo en gris (*Ejemplo*) es solo documentación, no tu resultado.\n\nEl rol ya viene elegido (`DIRECTOR`, puede usar todo). Para cambiarlo pulsa **Autorizar** (arriba a la derecha).\n\n## Recorrido sugerido (cada paso usa el `id` que devolvió el anterior)\n| # | Recurso | Qué demuestra |\n|---|---|---|\n| 1 | `POST /tutores` → `POST /pacientes` | Alta de tutor y mascota (US01) |\n| 2 | `POST /pacientes/{id}/alergias` | Registrar alergia a *penicilina* |\n| 3 | `POST /consultas` | Abrir consulta con cédula del veterinario |\n| 4 | `POST /consultas/{id}/recetas` | **409 RN-04**: bloqueo por alergia |\n| 5 | misma receta + `justificacion` y `cedula_justificante` | **201**: excepción clínica (ADR-002) |\n| 6 | `PUT …/nota` → `POST …/nota/firmar` | Redactar y firmar la nota SOAP (US05) |\n| 7 | `PUT …/nota` otra vez | **409 RN-01**: una nota firmada no se edita |\n| 8 | `POST …/enmiendas` | **201**: la corrección va como nota de enmienda (US13) |\n| 9 | `POST /hospitalizaciones` (jaula `JP-01`) | Ingreso a hospitalización (US09) |\n| 10 | `POST …/alta-medica` → `POST …/liquidacion` | **RN-06**: la jaula se libera solo con alta firmada **y** cuenta liquidada |\n| 11 | `GET /ordenes/VET-O001` → `POST …/transiciones` | Datos del profesor, Specification y State Machine |\n\n## Códigos de respuesta\n**201** creado · **200** correcto · **400** dato inválido · **401** falta o es desconocido el rol · **403** el rol no tiene acceso (RNF-03) ·\n**404** el id no existe · **409** regla de negocio o estado no permitido · **422** el JSON no cumple el contrato.\nLos errores de negocio responden `{\"codigo\": \"...\", \"mensaje\": \"...\"}` con el motivo exacto.\n\n## Datos que conviene saber\n- Importes y pesos viajan como **texto** (`\"7587.00\"`) para no perder precisión.\n- Con `SEED_ON_START=true` ya existen los datos del profesor: tutor `VET-C012`, servicios `VET-P001…`, órdenes `VET-O001…` y las 20 jaulas (`JP-01…`, `JG-01…`, `JA-01…`).\n- La autenticación por `X-Rol` es una **demostración** (ADR-004); en producción se reemplaza por JWT sin tocar el dominio.\n",
+    "contact": {
+      "name": "Equipo 4 · FIME-UANL"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "9 · Operación"
+        ],
+        "summary": "Verificar que el servicio está vivo",
+        "description": "No requiere rol. Lo usa la plataforma de despliegue para saber que la API arrancó.\n\n**Roles con acceso:** cualquiera (no requiere `X-Rol`).",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tutores": {
+      "post": {
+        "tags": [
+          "1 · Tutores y mascotas"
+        ],
+        "summary": "Registrar un tutor",
+        "description": "Crea al responsable de una mascota. Exige **teléfono o correo** de contacto.\n\nResultado: el `id` (`TUT-…`) se usa en `POST /pacientes`.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "crear_tutor_tutores_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TutorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutorOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/tutores/{tutor_id}": {
+      "get": {
+        "tags": [
+          "1 · Tutores y mascotas"
+        ],
+        "summary": "Consultar un tutor",
+        "description": "Devuelve el tutor. Prueba con `VET-C012` (viene en los datos del profesor).\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "obtener_tutor_tutores__tutor_id__get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tutor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tutor Id"
+            },
+            "description": "`id` del tutor (lo devuelve POST /tutores). Con los datos del profesor: VET-C012",
+            "example": "VET-C012"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutorOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pacientes": {
+      "post": {
+        "tags": [
+          "1 · Tutores y mascotas"
+        ],
+        "summary": "Registrar una mascota (US01)",
+        "description": "Crea el expediente (`EXP-…`). `especie` es PERRO, GATO u OTRO. El microchip, si se manda, debe ser único.\n\nResultado: el `id` (`PAC-…`) se usa en casi todos los demás recursos.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "registrar_mascota_pacientes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MascotaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacienteOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/pacientes/buscar": {
+      "get": {
+        "tags": [
+          "1 · Tutores y mascotas"
+        ],
+        "summary": "Buscar mascotas por nombre, microchip, expediente o dueño (US12)",
+        "description": "Búsqueda predictiva: escribe al menos 2 letras en `q` (nombre de la mascota o del tutor, teléfono del tutor, microchip o código de expediente).\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "buscar_pacientes_pacientes_buscar_get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PacienteOut"
+                  },
+                  "title": "Response Buscar Pacientes Pacientes Buscar Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pacientes/{paciente_id}": {
+      "get": {
+        "tags": [
+          "1 · Tutores y mascotas"
+        ],
+        "summary": "Consultar una mascota",
+        "description": "Datos generales y alertas de alergia. No incluye información clínica (eso es el expediente).\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "obtener_paciente_pacientes__paciente_id__get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paciente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Paciente Id"
+            },
+            "description": "`id` de la mascota (lo devuelve POST /pacientes)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacienteOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pacientes/{paciente_id}/expediente": {
+      "get": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Ver el expediente clínico completo",
+        "description": "**RNF-03:** solo personal médico. Si entras como `RECEPCION` responde **403**: es la forma más rápida de demostrar el control de acceso.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "expediente_pacientes__paciente_id__expediente_get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paciente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Paciente Id"
+            },
+            "description": "`id` de la mascota (lo devuelve POST /pacientes)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pacientes/{paciente_id}/triaje": {
+      "post": {
+        "tags": [
+          "2 · Triaje y urgencias"
+        ],
+        "summary": "Capturar el triaje inicial (US04)",
+        "description": "Actualiza peso y alergias del perfil y deja la hoja de triaje en el expediente. La temperatura debe estar entre 30 y 45 °C.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "capturar_triaje_pacientes__paciente_id__triaje_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paciente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Paciente Id"
+            },
+            "description": "`id` de la mascota (lo devuelve POST /pacientes)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriajeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacienteOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pacientes/{paciente_id}/alergias": {
+      "post": {
+        "tags": [
+          "2 · Triaje y urgencias"
+        ],
+        "summary": "Registrar una alergia",
+        "description": "Agrega un principio activo (en minúsculas, sin duplicar). A partir de aquí **RN-04** bloqueará recetas con ese principio.\n\n**Roles con acceso:** `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "registrar_alergia_pacientes__paciente_id__alergias_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paciente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Paciente Id"
+            },
+            "description": "`id` de la mascota (lo devuelve POST /pacientes)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlergiaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacienteOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pacientes/{paciente_id}/transferencia": {
+      "post": {
+        "tags": [
+          "1 · Tutores y mascotas"
+        ],
+        "summary": "Transferir la titularidad a otro tutor (RN-05)",
+        "description": "El historial clínico **pertenece al animal**: cambia el responsable, el expediente se conserva intacto. `nuevo_tutor_id` debe existir y estar activo.\n\n**Roles con acceso:** `RECEPCION`, `DIRECTOR`",
+        "operationId": "transferir_pacientes__paciente_id__transferencia_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paciente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Paciente Id"
+            },
+            "description": "`id` de la mascota (lo devuelve POST /pacientes)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferenciaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacienteOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/urgencias": {
+      "post": {
+        "tags": [
+          "2 · Triaje y urgencias"
+        ],
+        "summary": "Admitir una emergencia Código Rojo (US03, RN-02)",
+        "description": "Abre una consulta urgente **sin exigir trámites administrativos** (sin paciente ni datos del tutor). Mientras no se regularice no puede recetar ni pedir estudios.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "admitir_urgencia_urgencias_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UrgenciaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/urgencias/{consulta_id}/regularizar": {
+      "post": {
+        "tags": [
+          "2 · Triaje y urgencias"
+        ],
+        "summary": "Asignar el paciente a una urgencia ya atendida",
+        "description": "Completa la parte administrativa después de estabilizar al animal. Manda `paciente_id` como parámetro de la URL.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "regularizar_urgencia_urgencias__consulta_id__regularizar_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          },
+          {
+            "name": "paciente_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Paciente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consultas": {
+      "post": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Abrir una consulta",
+        "description": "Une al paciente con el veterinario que lo atiende (cédula profesional). Resultado: el `id` (`CON-…`) para receta, nota y laboratorio.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "abrir_consulta_consultas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsultaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/consultas/{consulta_id}": {
+      "get": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Consultar una consulta",
+        "description": "Nota, receta, enmiendas y estudios de laboratorio.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "obtener_consulta_consultas__consulta_id__get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consultas/{consulta_id}/nota": {
+      "put": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Redactar o editar la nota SOAP",
+        "description": "Subjetivo, Objetivo, Análisis y Plan. **RN-01:** si la nota ya está firmada responde **409** `NotaInmutableError`; solo se admite una enmienda.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "redactar_nota_consultas__consulta_id__nota_put",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consultas/{consulta_id}/nota/firmar": {
+      "post": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Firmar y cerrar la nota (US05, RN-01)",
+        "description": "Con la cédula del veterinario la nota queda **congelada** para siempre.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "firmar_nota_consultas__consulta_id__nota_firmar_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirmaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consultas/{consulta_id}/enmiendas": {
+      "post": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Anexar una nota de enmienda (US13)",
+        "description": "La forma correcta de corregir una nota firmada: la original no cambia, la enmienda queda anexa con motivo, detalle y cédula.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "anexar_enmienda_consultas__consulta_id__enmiendas_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnmiendaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consultas/{consulta_id}/recetas": {
+      "post": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Prescribir un medicamento (US06, RN-04)",
+        "description": "Si el principio activo coincide con una alergia del paciente responde **409** `AlergiaBloqueoError`.\n\nPara continuar de todos modos manda `justificacion` y `cedula_justificante` (excepción clínica, ADR-002): responde **201**.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "prescribir_consultas__consulta_id__recetas_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecetaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consultas/{consulta_id}/laboratorio": {
+      "post": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Solicitar un estudio de laboratorio (US14)",
+        "description": "Registra la petición. Resultado: el `id` del estudio (`estudios[].id`) que se usa para adjuntar el resultado.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "solicitar_estudio_consultas__consulta_id__laboratorio_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstudioIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consultas/{consulta_id}/laboratorio/{estudio_id}/resultado": {
+      "post": {
+        "tags": [
+          "3 · Consultas y expediente"
+        ],
+        "summary": "Adjuntar el resultado y avisar al médico (US14)",
+        "description": "Guarda el nombre del archivo y su huella SHA-256 (no el archivo). Se dispara un evento que **alerta al médico tratante**.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "adjuntar_resultado_consultas__consulta_id__laboratorio__estudio_id__resultado_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consulta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consulta Id"
+            },
+            "description": "`id` de la consulta (lo devuelve POST /consultas o POST /urgencias)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CONSULTA"
+          },
+          {
+            "name": "estudio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Estudio Id"
+            },
+            "description": "`id` del estudio, dentro de `estudios` de la consulta",
+            "example": "PEGA-AQUI-EL-ID-DEL-ESTUDIO"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultadoLabIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vacunas": {
+      "post": {
+        "tags": [
+          "4 · Vacunas y recordatorios"
+        ],
+        "summary": "Registrar una vacuna aplicada (US07, RN-03)",
+        "description": "**RN-03:** `lote` y `marca` son obligatorios; sin ellos responde 400. Calcula solo la fecha del refuerzo (21, 28 o 365 días según el esquema o la edad).\n\n**Roles con acceso:** `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "registrar_vacuna_vacunas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VacunaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacunaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/recordatorios/procesar": {
+      "post": {
+        "tags": [
+          "4 · Vacunas y recordatorios"
+        ],
+        "summary": "Enviar los recordatorios de refuerzo pendientes (US08)",
+        "description": "Avisa por el canal preferido del tutor (WhatsApp o correo) a quienes tienen refuerzo en ~48 h. Los envíos son **simulados** y quedan registrados.\n\n**Roles con acceso:** `RECEPCION`, `DIRECTOR`",
+        "operationId": "procesar_recordatorios_recordatorios_procesar_post",
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/citas": {
+      "post": {
+        "tags": [
+          "5 · Citas"
+        ],
+        "summary": "Agendar una cita (US02)",
+        "description": "La duración y la sala dependen del servicio: vacuna 15 min, consulta 30, especialidad 45, cirugía 90–120 (quirófano). **409** si no hay sala libre o la fecha ya pasó. `inicio` en ISO 8601.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "agendar_cita_citas_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CitaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "5 · Citas"
+        ],
+        "summary": "Ver las citas de un día",
+        "description": "Indica la fecha en `dia` (AAAA-MM-DD).\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "citas_del_dia_citas_get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dia",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "YYYY-MM-DD (UTC)",
+              "title": "Dia"
+            },
+            "description": "YYYY-MM-DD (UTC)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CitaOut"
+                  },
+                  "title": "Response Citas Del Dia Citas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/citas/{cita_id}": {
+      "get": {
+        "tags": [
+          "5 · Citas"
+        ],
+        "summary": "Consultar una cita",
+        "description": "Incluye `acciones_permitidas` según su estado.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "obtener_cita_citas__cita_id__get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cita_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cita Id"
+            },
+            "description": "`id` de la cita (lo devuelve POST /citas)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CITA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/citas/{cita_id}/cancelar": {
+      "post": {
+        "tags": [
+          "5 · Citas"
+        ],
+        "summary": "Cancelar una cita (US02)",
+        "description": "Libera la sala. Si faltan **menos de 4 h** se marca `cancelacion_tardia` (cuenta en los KPIs).\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "cancelar_cita_citas__cita_id__cancelar_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cita_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cita Id"
+            },
+            "description": "`id` de la cita (lo devuelve POST /citas)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-CITA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jaulas": {
+      "get": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Listar las jaulas",
+        "description": "`libres=true` muestra solo las desocupadas. Hay 12 de perro (`JP-`), 6 de gato (`JG-`) y 2 de aislamiento (`JA-`).\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "listar_jaulas_jaulas_get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "libres",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Libres"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JaulaOut"
+                  },
+                  "title": "Response Listar Jaulas Jaulas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hospitalizaciones": {
+      "post": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Ingresar a un paciente a hospitalización (US09)",
+        "description": "Asigna la jaula. **409** si está ocupada, si no corresponde a la especie o si se mezcla un paciente contagioso fuera de aislamiento (y al revés).\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "ingresar_hospitalizaciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HospitalizacionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HospitalizacionOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/hospitalizaciones/alertas/lecturas-vencidas": {
+      "get": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Pacientes con constantes vitales vencidas (US10)",
+        "description": "Lista a quienes no tienen lectura dentro de la ventana: **4 h** si están estables, **2 h** si están críticos.\n\n**Roles con acceso:** `ENFERMERIA`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "lecturas_vencidas_hospitalizaciones_alertas_lecturas_vencidas_get",
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HospitalizacionOut"
+                  },
+                  "type": "array",
+                  "title": "Response Lecturas Vencidas Hospitalizaciones Alertas Lecturas Vencidas Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/hospitalizaciones/{hid}": {
+      "get": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Consultar una hospitalización",
+        "description": "Estado, bitácora, precuenta y si ya es `apto_para_egreso`.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `ENFERMERIA`, `DIRECTOR`",
+        "operationId": "obtener_hospitalizacion_hospitalizaciones__hid__get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Hid"
+            },
+            "description": "`id` de la hospitalización (lo devuelve POST /hospitalizaciones)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-HOSPITALIZACION"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HospitalizacionOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hospitalizaciones/{hid}/constantes": {
+      "post": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Registrar constantes vitales (US10)",
+        "description": "Una lectura fuera de rango marca al paciente como CRÍTICO (ventana de 2 h) hasta que una lectura vuelva a ser normal.\n\n**Roles con acceso:** `ENFERMERIA`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "registrar_constantes_hospitalizaciones__hid__constantes_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Hid"
+            },
+            "description": "`id` de la hospitalización (lo devuelve POST /hospitalizaciones)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-HOSPITALIZACION"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConstantesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HospitalizacionOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hospitalizaciones/{hid}/consumos": {
+      "post": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Agregar un consumo a la precuenta",
+        "description": "Suma medicamentos o servicios al total que se liquidará al egreso.\n\n**Roles con acceso:** `ENFERMERIA`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "agregar_consumo_hospitalizaciones__hid__consumos_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Hid"
+            },
+            "description": "`id` de la hospitalización (lo devuelve POST /hospitalizaciones)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-HOSPITALIZACION"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsumoIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HospitalizacionOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hospitalizaciones/{hid}/alta-medica": {
+      "post": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Alta cruzada, paso 1: firma del veterinario (US11, RN-06)",
+        "description": "Responde `PENDIENTE_VALIDACION_CRUZADA`: la jaula **sigue ocupada** hasta que recepción liquide la cuenta.\n\n**Roles con acceso:** `VETERINARIO`, `DIRECTOR`",
+        "operationId": "firmar_alta_hospitalizaciones__hid__alta_medica_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Hid"
+            },
+            "description": "`id` de la hospitalización (lo devuelve POST /hospitalizaciones)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-HOSPITALIZACION"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirmaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AltaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hospitalizaciones/{hid}/liquidacion": {
+      "post": {
+        "tags": [
+          "6 · Hospitalización"
+        ],
+        "summary": "Alta cruzada, paso 2: liquidación en recepción (US11, RN-06)",
+        "description": "Si el alta ya estaba firmada responde `EGRESO_CONCLUIDO` y la jaula queda libre. El orden de los dos pasos no importa; se necesitan **ambos**.\n\n**Roles con acceso:** `RECEPCION`, `DIRECTOR`",
+        "operationId": "liquidar_hospitalizaciones__hid__liquidacion_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Hid"
+            },
+            "description": "`id` de la hospitalización (lo devuelve POST /hospitalizaciones)",
+            "example": "PEGA-AQUI-EL-ID-DE-LA-HOSPITALIZACION"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AltaOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicios": {
+      "get": {
+        "tags": [
+          "7 · Órdenes de servicio"
+        ],
+        "summary": "Catálogo de servicios del profesor",
+        "description": "Precio, capacidad y si está habilitado (`VET-P001…`).\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "listar_servicios_servicios_get",
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServicioOut"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Servicios Servicios Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/ordenes": {
+      "post": {
+        "tags": [
+          "7 · Órdenes de servicio"
+        ],
+        "summary": "Solicitar una orden de servicio",
+        "description": "Valida cantidades, capacidad y disponibilidad. Devuelve el total, si `puede_procesarse` (Specification `TutorActivo & OrdenConLineas & OrdenAutorizada`) y por qué no, en `motivos_no_procesable`.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "solicitar_orden_ordenes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                },
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ]
+      }
+    },
+    "/ordenes/{orden_id}": {
+      "get": {
+        "tags": [
+          "7 · Órdenes de servicio"
+        ],
+        "summary": "Consultar una orden",
+        "description": "Prueba con `VET-O001`: total `7587.00` y `puede_procesarse: true`.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "obtener_orden_ordenes__orden_id__get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "orden_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Orden Id"
+            },
+            "description": "`id` de la orden. Con los datos del profesor: VET-O001",
+            "example": "VET-O001"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ordenes/{orden_id}/transiciones": {
+      "post": {
+        "tags": [
+          "7 · Órdenes de servicio"
+        ],
+        "summary": "Cambiar el estado de la orden (State Machine)",
+        "description": "`aprobar` (SOLICITADA→CONFIRMADA), `completar` (CONFIRMADA→REALIZADA) o `cancelar`. Una acción que no corresponde al estado actual responde **409** `InvalidStateTransition`.\n\n**Roles con acceso:** `RECEPCION`, `VETERINARIO`, `DIRECTOR`",
+        "operationId": "transicionar_ordenes__orden_id__transiciones_post",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "orden_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Orden Id"
+            },
+            "description": "`id` de la orden. Con los datos del profesor: VET-O001",
+            "example": "VET-O001"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reportes/operativo": {
+      "get": {
+        "tags": [
+          "8 · Reportes"
+        ],
+        "summary": "Indicadores operativos (US15)",
+        "description": "Ocupación de jaulas, vacunas aplicadas y citas canceladas (con las tardías) en el periodo. Sin fechas usa los últimos 7 días.\n\n**Roles con acceso:** `DIRECTOR`",
+        "operationId": "reporte_reportes_operativo_get",
+        "security": [
+          {
+            "X-Rol": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dato inválido (el mensaje dice cuál)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "ValidationDomainError",
+                  "mensaje": "Se requiere al menos teléfono o correo de contacto"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El id indicado no existe",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "EntityNotFound",
+                  "mensaje": "Paciente 'PAC-000000000000' no existe"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Se violó una regla de negocio o el estado no lo permite",
+            "content": {
+              "application/json": {
+                "example": {
+                  "codigo": "NotaInmutableError",
+                  "mensaje": "RN-01: la nota/receta está firmada y congelada; solo se admite una Nota de Enmienda"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AlergiaIn": {
+        "properties": {
+          "principio_activo": {
+            "type": "string",
+            "title": "Principio Activo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "principio_activo"
+        ],
+        "title": "AlergiaIn",
+        "examples": [
+          {
+            "principio_activo": "penicilina"
+          }
+        ]
+      },
+      "AltaOut": {
+        "properties": {
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "EGRESO_CONCLUIDO",
+              "PENDIENTE_VALIDACION_CRUZADA"
+            ],
+            "title": "Resultado"
+          },
+          "hospitalizacion": {
+            "$ref": "#/components/schemas/HospitalizacionOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resultado",
+          "hospitalizacion"
+        ],
+        "title": "AltaOut"
+      },
+      "CitaIn": {
+        "properties": {
+          "paciente_id": {
+            "type": "string",
+            "title": "Paciente Id"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "VACUNA",
+              "CONSULTA_GENERAL",
+              "ESPECIALIDAD",
+              "CIRUGIA"
+            ],
+            "title": "Tipo"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio",
+            "description": "ISO 8601; sin zona horaria se interpreta como UTC"
+          },
+          "duracion_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duracion Min",
+            "description": "Solo CIRUGIA: 90–120 min (por omisión 90)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paciente_id",
+          "tipo",
+          "inicio"
+        ],
+        "title": "CitaIn",
+        "examples": [
+          {
+            "inicio": "2026-12-07T10:00:00",
+            "paciente_id": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA",
+            "tipo": "CONSULTA_GENERAL"
+          }
+        ]
+      },
+      "CitaOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "paciente_id": {
+            "type": "string",
+            "title": "Paciente Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "sala": {
+            "type": "string",
+            "title": "Sala"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio"
+          },
+          "fin": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fin"
+          },
+          "duracion_min": {
+            "type": "integer",
+            "title": "Duracion Min"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "cancelacion_tardia": {
+            "type": "boolean",
+            "title": "Cancelacion Tardia"
+          },
+          "acciones_permitidas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Acciones Permitidas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "paciente_id",
+          "tipo",
+          "sala",
+          "inicio",
+          "fin",
+          "duracion_min",
+          "estado",
+          "cancelacion_tardia",
+          "acciones_permitidas"
+        ],
+        "title": "CitaOut",
+        "examples": [
+          {
+            "acciones_permitidas": [
+              "confirmar",
+              "cancelar"
+            ],
+            "cancelacion_tardia": false,
+            "duracion_min": 30,
+            "estado": "SOLICITADA",
+            "fin": "2026-12-07T10:30:00",
+            "id": "CIT-5b2d7e90c1f4",
+            "inicio": "2026-12-07T10:00:00",
+            "paciente_id": "PAC-8e41b0c5a9d2",
+            "sala": "CONSULTORIO",
+            "tipo": "CONSULTA_GENERAL"
+          }
+        ]
+      },
+      "ConstantesIn": {
+        "properties": {
+          "temperatura_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Temperatura C"
+          },
+          "frecuencia_cardiaca": {
+            "type": "integer",
+            "title": "Frecuencia Cardiaca"
+          },
+          "frecuencia_respiratoria": {
+            "type": "integer",
+            "title": "Frecuencia Respiratoria"
+          },
+          "registrada_por": {
+            "type": "string",
+            "title": "Registrada Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "temperatura_c",
+          "frecuencia_cardiaca",
+          "frecuencia_respiratoria",
+          "registrada_por"
+        ],
+        "title": "ConstantesIn",
+        "examples": [
+          {
+            "frecuencia_cardiaca": 100,
+            "frecuencia_respiratoria": 24,
+            "registrada_por": "enfermera.lopez",
+            "temperatura_c": "38.5"
+          }
+        ]
+      },
+      "ConsultaIn": {
+        "properties": {
+          "paciente_id": {
+            "type": "string",
+            "title": "Paciente Id"
+          },
+          "cedula_veterinario": {
+            "type": "string",
+            "title": "Cedula Veterinario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paciente_id",
+          "cedula_veterinario"
+        ],
+        "title": "ConsultaIn",
+        "examples": [
+          {
+            "cedula_veterinario": "1234567",
+            "paciente_id": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA"
+          }
+        ]
+      },
+      "ConsultaOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "paciente_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paciente Id"
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage"
+          },
+          "nota": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Nota"
+          },
+          "receta": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Receta"
+          },
+          "enmiendas": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Enmiendas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "paciente_id",
+          "triage",
+          "nota",
+          "receta",
+          "enmiendas"
+        ],
+        "title": "ConsultaOut",
+        "examples": [
+          {
+            "enmiendas": [],
+            "id": "CON-a7c3e19d4b62",
+            "nota": {
+              "firmada": false
+            },
+            "paciente_id": "PAC-8e41b0c5a9d2",
+            "receta": []
+          }
+        ]
+      },
+      "ConsumoIn": {
+        "properties": {
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "monto": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Monto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "descripcion",
+          "monto"
+        ],
+        "title": "ConsumoIn",
+        "examples": [
+          {
+            "descripcion": "Suero Ringer 500 ml",
+            "monto": "185.00"
+          }
+        ]
+      },
+      "EnmiendaIn": {
+        "properties": {
+          "cedula": {
+            "type": "string",
+            "title": "Cedula"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cedula",
+          "motivo",
+          "detalle"
+        ],
+        "title": "EnmiendaIn",
+        "examples": [
+          {
+            "cedula": "1234567",
+            "detalle": "El peso correcto es 12.8 kg, no 12.5 kg.",
+            "motivo": "Corrección de peso"
+          }
+        ]
+      },
+      "ErrorOut": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo",
+            "description": "Tipo de error de negocio, p. ej. AlergiaBloqueoError, NotaInmutableError, InvalidStateTransition"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje",
+            "description": "Explicación legible del motivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "mensaje"
+        ],
+        "title": "ErrorOut"
+      },
+      "EstudioIn": {
+        "properties": {
+          "tipo_estudio": {
+            "type": "string",
+            "title": "Tipo Estudio",
+            "description": "p. ej. 'Hemograma completo', 'Perfil hematológico'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo_estudio"
+        ],
+        "title": "EstudioIn",
+        "examples": [
+          {
+            "tipo_estudio": "Hemograma completo"
+          }
+        ]
+      },
+      "FirmaIn": {
+        "properties": {
+          "cedula": {
+            "type": "string",
+            "title": "Cedula"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cedula"
+        ],
+        "title": "FirmaIn",
+        "examples": [
+          {
+            "cedula": "1234567"
+          }
+        ]
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HospitalizacionIn": {
+        "properties": {
+          "paciente_id": {
+            "type": "string",
+            "title": "Paciente Id"
+          },
+          "jaula_id": {
+            "type": "string",
+            "title": "Jaula Id"
+          },
+          "plan_fluidoterapia": {
+            "type": "string",
+            "title": "Plan Fluidoterapia"
+          },
+          "contagioso": {
+            "type": "boolean",
+            "title": "Contagioso",
+            "default": false
+          },
+          "critico": {
+            "type": "boolean",
+            "title": "Critico",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "paciente_id",
+          "jaula_id",
+          "plan_fluidoterapia"
+        ],
+        "title": "HospitalizacionIn",
+        "examples": [
+          {
+            "contagioso": false,
+            "critico": false,
+            "jaula_id": "JP-01",
+            "paciente_id": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA",
+            "plan_fluidoterapia": "Suero Ringer 20 ml/h por 24 h"
+          }
+        ]
+      },
+      "HospitalizacionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "paciente_id": {
+            "type": "string",
+            "title": "Paciente Id"
+          },
+          "jaula_id": {
+            "type": "string",
+            "title": "Jaula Id"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "criticidad": {
+            "type": "string",
+            "title": "Criticidad"
+          },
+          "alta_medica_firmada": {
+            "type": "boolean",
+            "title": "Alta Medica Firmada"
+          },
+          "cuenta_liquidada": {
+            "type": "boolean",
+            "title": "Cuenta Liquidada"
+          },
+          "apto_para_egreso": {
+            "type": "boolean",
+            "title": "Apto Para Egreso"
+          },
+          "precuenta_total": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precuenta Total"
+          },
+          "bitacora": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Bitacora"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "paciente_id",
+          "jaula_id",
+          "estado",
+          "criticidad",
+          "alta_medica_firmada",
+          "cuenta_liquidada",
+          "apto_para_egreso",
+          "precuenta_total",
+          "bitacora"
+        ],
+        "title": "HospitalizacionOut",
+        "examples": [
+          {
+            "alta_medica_firmada": false,
+            "apto_para_egreso": false,
+            "bitacora": [],
+            "criticidad": "ESTABLE",
+            "cuenta_liquidada": false,
+            "estado": "HOSPITALIZADO",
+            "id": "HOS-c04e92b7a1d8",
+            "jaula_id": "JP-01",
+            "paciente_id": "PAC-8e41b0c5a9d2",
+            "precuenta_total": "185.00"
+          }
+        ]
+      },
+      "JaulaOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "libre": {
+            "type": "boolean",
+            "title": "Libre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "libre"
+        ],
+        "title": "JaulaOut",
+        "examples": [
+          {
+            "id": "JP-01",
+            "libre": true,
+            "tipo": "PERRO"
+          }
+        ]
+      },
+      "LineaIn": {
+        "properties": {
+          "servicio_id": {
+            "type": "string",
+            "title": "Servicio Id"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "servicio_id",
+          "cantidad"
+        ],
+        "title": "LineaIn",
+        "examples": [
+          {
+            "cantidad": 2,
+            "servicio_id": "VET-P001"
+          }
+        ]
+      },
+      "MascotaIn": {
+        "properties": {
+          "tutor_id": {
+            "type": "string",
+            "title": "Tutor Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "especie": {
+            "type": "string",
+            "title": "Especie",
+            "description": "PERRO | GATO | OTRO"
+          },
+          "raza": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raza"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "peso_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peso Kg"
+          },
+          "microchip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Microchip"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tutor_id",
+          "nombre",
+          "especie"
+        ],
+        "title": "MascotaIn",
+        "examples": [
+          {
+            "especie": "PERRO",
+            "fecha_nacimiento": "2023-05-10",
+            "nombre": "Firulais",
+            "peso_kg": "12.5",
+            "raza": "Labrador",
+            "tutor_id": "PEGA-AQUI-EL-ID-DEL-TUTOR"
+          }
+        ]
+      },
+      "NotaIn": {
+        "properties": {
+          "subjetivo": {
+            "type": "string",
+            "title": "Subjetivo"
+          },
+          "objetivo": {
+            "type": "string",
+            "title": "Objetivo"
+          },
+          "analisis": {
+            "type": "string",
+            "title": "Analisis"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subjetivo",
+          "objetivo",
+          "analisis",
+          "plan"
+        ],
+        "title": "NotaIn",
+        "examples": [
+          {
+            "analisis": "Gastroenteritis aguda.",
+            "objetivo": "T 38.6 °C, mucosas rosadas, deshidratación leve.",
+            "plan": "Dieta blanda 48 h y control en 3 días.",
+            "subjetivo": "El tutor refiere vómito desde ayer."
+          }
+        ]
+      },
+      "OrdenIn": {
+        "properties": {
+          "tutor_id": {
+            "type": "string",
+            "title": "Tutor Id"
+          },
+          "lineas": {
+            "items": {
+              "$ref": "#/components/schemas/LineaIn"
+            },
+            "type": "array",
+            "title": "Lineas"
+          },
+          "promocion_activa": {
+            "type": "boolean",
+            "title": "Promocion Activa",
+            "default": false
+          },
+          "autorizado": {
+            "type": "boolean",
+            "title": "Autorizado",
+            "default": true
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tutor_id",
+          "lineas"
+        ],
+        "title": "OrdenIn",
+        "examples": [
+          {
+            "autorizado": true,
+            "lineas": [
+              {
+                "cantidad": 2,
+                "servicio_id": "VET-P001"
+              }
+            ],
+            "promocion_activa": false,
+            "tutor_id": "VET-C012"
+          }
+        ]
+      },
+      "OrdenOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "tutor_id": {
+            "type": "string",
+            "title": "Tutor Id"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total"
+          },
+          "puede_procesarse": {
+            "type": "boolean",
+            "title": "Puede Procesarse"
+          },
+          "motivos_no_procesable": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Motivos No Procesable"
+          },
+          "elegible_beneficio_referencia": {
+            "type": "boolean",
+            "title": "Elegible Beneficio Referencia"
+          },
+          "acciones_permitidas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Acciones Permitidas"
+          },
+          "lineas": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Lineas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tutor_id",
+          "estado",
+          "total",
+          "puede_procesarse",
+          "motivos_no_procesable",
+          "elegible_beneficio_referencia",
+          "acciones_permitidas",
+          "lineas"
+        ],
+        "title": "OrdenOut",
+        "examples": [
+          {
+            "acciones_permitidas": [
+              "aprobar",
+              "cancelar"
+            ],
+            "elegible_beneficio_referencia": false,
+            "estado": "SOLICITADA",
+            "id": "VET-O001",
+            "lineas": [],
+            "motivos_no_procesable": [],
+            "puede_procesarse": true,
+            "total": "7587.00",
+            "tutor_id": "VET-C012"
+          }
+        ]
+      },
+      "PacienteOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "codigo_expediente": {
+            "type": "string",
+            "title": "Codigo Expediente"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "especie": {
+            "type": "string",
+            "title": "Especie"
+          },
+          "tutor_id": {
+            "type": "string",
+            "title": "Tutor Id"
+          },
+          "peso_kg": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peso Kg"
+          },
+          "microchip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Microchip"
+          },
+          "alerta_alergia": {
+            "type": "boolean",
+            "title": "Alerta Alergia"
+          },
+          "alergias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alergias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "codigo_expediente",
+          "nombre",
+          "especie",
+          "tutor_id",
+          "peso_kg",
+          "microchip",
+          "alerta_alergia",
+          "alergias"
+        ],
+        "title": "PacienteOut",
+        "examples": [
+          {
+            "alergias": [
+              "penicilina"
+            ],
+            "alerta_alergia": true,
+            "codigo_expediente": "EXP-2026-0001",
+            "especie": "PERRO",
+            "id": "PAC-8e41b0c5a9d2",
+            "nombre": "Firulais",
+            "peso_kg": "12.5",
+            "tutor_id": "TUT-3f9a1c2b7d10"
+          }
+        ]
+      },
+      "RecetaIn": {
+        "properties": {
+          "principio_activo": {
+            "type": "string",
+            "title": "Principio Activo"
+          },
+          "dosis_mg_por_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Dosis Mg Por Kg"
+          },
+          "via": {
+            "type": "string",
+            "title": "Via"
+          },
+          "frecuencia_horas": {
+            "type": "integer",
+            "title": "Frecuencia Horas"
+          },
+          "duracion_dias": {
+            "type": "integer",
+            "title": "Duracion Dias"
+          },
+          "justificacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Justificacion",
+            "description": "Justificación clínica para prescribir pese a una alergia (ADR-002)"
+          },
+          "cedula_justificante": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cedula Justificante"
+          }
+        },
+        "type": "object",
+        "required": [
+          "principio_activo",
+          "dosis_mg_por_kg",
+          "via",
+          "frecuencia_horas",
+          "duracion_dias"
+        ],
+        "title": "RecetaIn",
+        "examples": [
+          {
+            "dosis_mg_por_kg": "10",
+            "duracion_dias": 5,
+            "frecuencia_horas": 8,
+            "principio_activo": "penicilina",
+            "via": "oral"
+          }
+        ]
+      },
+      "ReporteOut": {
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date",
+            "title": "Desde"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date",
+            "title": "Hasta"
+          },
+          "tasa_ocupacion": {
+            "type": "number",
+            "title": "Tasa Ocupacion"
+          },
+          "vacunas_aplicadas": {
+            "type": "integer",
+            "title": "Vacunas Aplicadas"
+          },
+          "ordenes_canceladas": {
+            "type": "integer",
+            "title": "Ordenes Canceladas"
+          },
+          "citas_canceladas": {
+            "type": "integer",
+            "title": "Citas Canceladas"
+          },
+          "citas_canceladas_tardias": {
+            "type": "integer",
+            "title": "Citas Canceladas Tardias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "desde",
+          "hasta",
+          "tasa_ocupacion",
+          "vacunas_aplicadas",
+          "ordenes_canceladas",
+          "citas_canceladas",
+          "citas_canceladas_tardias"
+        ],
+        "title": "ReporteOut",
+        "examples": [
+          {
+            "citas_canceladas": 1,
+            "citas_canceladas_tardias": 0,
+            "desde": "2026-10-30",
+            "hasta": "2026-11-06",
+            "ordenes_canceladas": 0,
+            "tasa_ocupacion": 0.15,
+            "vacunas_aplicadas": 3
+          }
+        ]
+      },
+      "ResultadoLabIn": {
+        "properties": {
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo",
+            "description": "Archivo remitido por el laboratorio (.pdf/.png/.jpg)"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256",
+            "description": "Huella SHA-256 del archivo para integridad (opcional)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre_archivo"
+        ],
+        "title": "ResultadoLabIn",
+        "examples": [
+          {
+            "nombre_archivo": "hemograma_firulais.pdf",
+            "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          }
+        ]
+      },
+      "ServicioOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "precio": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio"
+          },
+          "capacidad": {
+            "type": "integer",
+            "title": "Capacidad"
+          },
+          "habilitado": {
+            "type": "boolean",
+            "title": "Habilitado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "descripcion",
+          "precio",
+          "capacidad",
+          "habilitado"
+        ],
+        "title": "ServicioOut",
+        "examples": [
+          {
+            "capacidad": 10,
+            "descripcion": "Consulta 01",
+            "habilitado": true,
+            "id": "VET-P001",
+            "precio": "313.00"
+          }
+        ]
+      },
+      "TransferenciaIn": {
+        "properties": {
+          "nuevo_tutor_id": {
+            "type": "string",
+            "title": "Nuevo Tutor Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nuevo_tutor_id"
+        ],
+        "title": "TransferenciaIn",
+        "examples": [
+          {
+            "nuevo_tutor_id": "PEGA-AQUI-EL-ID-DEL-NUEVO-TUTOR"
+          }
+        ]
+      },
+      "TransicionIn": {
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "aprobar",
+              "completar",
+              "cancelar"
+            ],
+            "title": "Accion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accion"
+        ],
+        "title": "TransicionIn",
+        "examples": [
+          {
+            "accion": "aprobar"
+          }
+        ]
+      },
+      "TriajeIn": {
+        "properties": {
+          "peso_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Peso Kg"
+          },
+          "temperatura_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Temperatura C"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo"
+          },
+          "alergias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alergias",
+            "default": []
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "ROJO",
+              "AMARILLO",
+              "VERDE"
+            ],
+            "title": "Nivel",
+            "default": "VERDE"
+          }
+        },
+        "type": "object",
+        "required": [
+          "peso_kg",
+          "temperatura_c",
+          "motivo"
+        ],
+        "title": "TriajeIn",
+        "examples": [
+          {
+            "alergias": [
+              "penicilina"
+            ],
+            "motivo": "Vómito y decaimiento desde ayer",
+            "nivel": "AMARILLO",
+            "peso_kg": "12.5",
+            "temperatura_c": "38.6"
+          }
+        ]
+      },
+      "TutorIn": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "identificacion_oficial": {
+            "type": "string",
+            "title": "Identificacion Oficial"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "ciudad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ciudad"
+          },
+          "canal_preferido": {
+            "type": "string",
+            "enum": [
+              "WHATSAPP",
+              "CORREO"
+            ],
+            "title": "Canal Preferido",
+            "default": "CORREO"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "identificacion_oficial"
+        ],
+        "title": "TutorIn",
+        "examples": [
+          {
+            "canal_preferido": "WHATSAPP",
+            "ciudad": "Monterrey",
+            "email": "ana@example.com",
+            "identificacion_oficial": "INE-ABC123456",
+            "nombre": "Ana López",
+            "telefono": "8112345678"
+          }
+        ]
+      },
+      "TutorOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          },
+          "es_preferente": {
+            "type": "boolean",
+            "title": "Es Preferente"
+          },
+          "canal_preferido": {
+            "type": "string",
+            "title": "Canal Preferido"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "activo",
+          "es_preferente",
+          "canal_preferido"
+        ],
+        "title": "TutorOut",
+        "examples": [
+          {
+            "activo": true,
+            "canal_preferido": "WHATSAPP",
+            "es_preferente": false,
+            "id": "TUT-3f9a1c2b7d10",
+            "nombre": "Ana López"
+          }
+        ]
+      },
+      "UrgenciaIn": {
+        "properties": {
+          "descripcion_trauma": {
+            "type": "string",
+            "title": "Descripcion Trauma"
+          },
+          "paciente_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paciente Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "descripcion_trauma"
+        ],
+        "title": "UrgenciaIn",
+        "examples": [
+          {
+            "descripcion_trauma": "Atropellado, sangrado activo en extremidad posterior"
+          }
+        ]
+      },
+      "VacunaIn": {
+        "properties": {
+          "paciente_id": {
+            "type": "string",
+            "title": "Paciente Id"
+          },
+          "nombre_vacuna": {
+            "type": "string",
+            "title": "Nombre Vacuna"
+          },
+          "lote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote"
+          },
+          "marca": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca"
+          },
+          "fecha_aplicacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Aplicacion"
+          },
+          "esquema": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CACHORRO_21",
+                  "CACHORRO_28",
+                  "ANUAL"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Esquema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paciente_id",
+          "nombre_vacuna"
+        ],
+        "title": "VacunaIn",
+        "examples": [
+          {
+            "esquema": "CACHORRO_21",
+            "lote": "L-2026-0457",
+            "marca": "Nobivac",
+            "nombre_vacuna": "Quíntuple canina",
+            "paciente_id": "PEGA-AQUI-EL-ID-DE-LA-MASCOTA"
+          }
+        ]
+      },
+      "VacunaOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "paciente_id": {
+            "type": "string",
+            "title": "Paciente Id"
+          },
+          "nombre_vacuna": {
+            "type": "string",
+            "title": "Nombre Vacuna"
+          },
+          "lote": {
+            "type": "string",
+            "title": "Lote"
+          },
+          "marca": {
+            "type": "string",
+            "title": "Marca"
+          },
+          "fecha_aplicacion": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Aplicacion"
+          },
+          "fecha_refuerzo": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Refuerzo"
+          },
+          "intervalo_dias": {
+            "type": "integer",
+            "title": "Intervalo Dias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "paciente_id",
+          "nombre_vacuna",
+          "lote",
+          "marca",
+          "fecha_aplicacion",
+          "fecha_refuerzo",
+          "intervalo_dias"
+        ],
+        "title": "VacunaOut",
+        "examples": [
+          {
+            "fecha_aplicacion": "2026-11-06",
+            "fecha_refuerzo": "2026-11-27",
+            "id": "VAC-1d6f8a30e5b7",
+            "intervalo_dias": 21,
+            "lote": "L-2026-0457",
+            "marca": "Nobivac",
+            "nombre_vacuna": "Quíntuple canina",
+            "paciente_id": "PAC-8e41b0c5a9d2"
+          }
+        ]
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "X-Rol": {
+        "type": "apiKey",
+        "description": "Rol del usuario (demostración, ADR-004): RECEPCION, VETERINARIO, ENFERMERIA o DIRECTOR. DIRECTOR puede usar todos los recursos; prueba otro rol para ver el 403 de RNF-03.",
+        "in": "header",
+        "name": "X-Rol"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "1 · Tutores y mascotas",
+      "description": "Registro de tutores y pacientes, búsqueda y transferencia de titularidad (US01, US12, RN-05)."
+    },
+    {
+      "name": "2 · Triaje y urgencias",
+      "description": "Triaje, alergias y admisión de emergencia Código Rojo (US03, US04, RN-02)."
+    },
+    {
+      "name": "3 · Consultas y expediente",
+      "description": "Consulta, nota SOAP, receta con bloqueo por alergia, enmiendas y laboratorio (US05, US06, US13, US14, RN-01, RN-04)."
+    },
+    {
+      "name": "4 · Vacunas y recordatorios",
+      "description": "Aplicación de vacunas con lote y marca, refuerzos y avisos 48 h antes (US07, US08, RN-03)."
+    },
+    {
+      "name": "5 · Citas",
+      "description": "Agenda con duración por servicio, sala sin solapes y cancelación (US02)."
+    },
+    {
+      "name": "6 · Hospitalización",
+      "description": "Jaulas, ingreso, constantes vitales, precuenta y alta cruzada (US09, US10, US11, RN-06)."
+    },
+    {
+      "name": "7 · Órdenes de servicio",
+      "description": "Paquete de datos del profesor: Specification (AND/OR/NOT) y máquina de estados de la orden."
+    },
+    {
+      "name": "8 · Reportes",
+      "description": "KPIs de ocupación, vacunación y citas canceladas para el Director (US15)."
+    },
+    {
+      "name": "9 · Operación",
+      "description": "Estado del servicio."
+    }
+  ]
+}

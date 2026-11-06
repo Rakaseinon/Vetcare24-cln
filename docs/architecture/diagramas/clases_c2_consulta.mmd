@@ -1,0 +1,29 @@
+classDiagram
+    direction TB
+    class Consulta { <<aggregate root>>
+        +abrir()
+        +admitir_urgencia() RN-02
+        +redactar_soap()
+        +firmar_y_cerrar() RN-01
+        +anexar_enmienda()
+        +agregar_a_receta()
+        +solicitar_estudio()
+        +adjuntar_resultado()
+    }
+    class CedulaProfesional { <<value object>> }
+    class NotaSOAP
+    class NotaEnmienda { <<value object>> }
+    class ItemReceta { <<value object>> }
+    class MedicamentoDosificado { <<value object>> }
+    class JustificacionClinica { <<value object>> }
+    class EstudioLaboratorio
+    class ResultadoLaboratorio { <<value object>> }
+    Consulta *-- CedulaProfesional
+    Consulta *-- NotaSOAP
+    Consulta *-- NotaEnmienda
+    Consulta *-- ItemReceta
+    ItemReceta *-- MedicamentoDosificado
+    ItemReceta o-- JustificacionClinica
+    Consulta *-- EstudioLaboratorio
+    EstudioLaboratorio o-- ResultadoLaboratorio
+    Consulta ..> Paciente : paciente_id

@@ -1,0 +1,18 @@
+classDiagram
+    direction TB
+    class Specification~T~ { <<abstract>>
+        +is_satisfied_by(candidato) bool
+        +reasons(candidato) list~str~
+    }
+    class AndSpecification
+    class OrSpecification
+    class NotSpecification
+    class TutorActivoSpec
+    class AlergenoCoincideSpec
+    class SalaLibreSpec
+    Specification <|-- AndSpecification
+    Specification <|-- OrSpecification
+    Specification <|-- NotSpecification
+    Specification <|-- TutorActivoSpec
+    Specification <|-- AlergenoCoincideSpec
+    Specification <|-- SalaLibreSpec

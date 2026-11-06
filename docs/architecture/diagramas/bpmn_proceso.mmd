@@ -1,0 +1,36 @@
+%%{init: {"flowchart": {"nodeSpacing": 28, "rankSpacing": 38}, "themeVariables": {"fontSize": "19px"}}}%%
+flowchart TB
+  subgraph REC["RECEPCIÓN Y TRIAJE"]
+    direction LR
+    A((Llegada del paciente)) --> B{¿Es Código Rojo / urgencia?}
+    B -- No: cita o rutina --> D["Búsqueda unificada del paciente y captura de triaje<br/>(peso, temperatura, alergias) · DO_01"]
+    D --> E["Asignación dinámica en agenda<br/>(bloques por tipo de servicio)"]
+    B -- "Sí (Código Rojo)" --> C["Botón «Admisión Urgencia»<br/>(pre-expediente)"]
+  end
+  subgraph CLI["ÁREA CLÍNICA (MÉDICO VETERINARIO)"]
+    direction LR
+    F["Estabilización inmediata<br/>(sala de choque)"] --> H["Consulta clínica, anamnesis<br/>y exploración física"]
+    H --> I{¿Requiere hospitalización?}
+    I -- No --> J["Tratamiento médico"]
+    J --> K["Prescripción farmacológica<br/>(validación contra alergias) · DO_03"]
+    J --> V["Aplicación de biológico<br/>(lote y marca obligatorios)"]
+    V --> W["Cálculo automático de refuerzo<br/>y recordatorio · DO_03"]
+    K --> L["Firmar y cerrar nota SOAP<br/>(inmutable + enmiendas) · DO_02"]
+  end
+  subgraph HOS["HOSPITALIZACIÓN Y MONITOREO 24/7"]
+    direction LR
+    M["Asignación de jaula y<br/>plan de fluidoterapia"] --> N["Monitoreo y registro de signos<br/>(cada 2 a 4 h) · DO_04"]
+    N --> O{¿Evolución favorable<br/>para alta médica?}
+    O -- "No: continuar plan" --> N
+    O -- Sí --> P["Firma de nota de egreso<br/>e indicaciones"]
+  end
+  Q["Auditoría de insumos, liquidación<br/>y egreso del paciente (RN-06)"]
+  Z((Proceso de atención concluido))
+  C --> F
+  E --> H
+  I -- Sí --> M
+  P --> Q --> Z
+  L --> Z
+  W --> Z
+  classDef rn fill:#fff7e0,stroke:#e0a800;
+  class K,L,V,Q rn

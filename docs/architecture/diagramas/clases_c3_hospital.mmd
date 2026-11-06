@@ -1,0 +1,21 @@
+classDiagram
+    direction TB
+    class Hospitalizacion { <<aggregate root>>
+        +ingresar()
+        +registrar_constantes()
+        +firmar_alta_medica()
+        +liquidar_cuenta()
+        +intentar_egreso() RN-06
+    }
+    class Jaula { <<aggregate root>>
+        +ocupar()
+        +liberar()
+    }
+    class LecturaBitacora { <<value object>> }
+    class ConstantesVitales { <<value object>> }
+    class ConsumoPrecuenta { <<value object>> }
+    Hospitalizacion *-- LecturaBitacora
+    LecturaBitacora *-- ConstantesVitales
+    Hospitalizacion *-- ConsumoPrecuenta
+    Hospitalizacion ..> Paciente : paciente_id
+    Hospitalizacion ..> Jaula : jaula_id

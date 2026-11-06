@@ -1,0 +1,31 @@
+classDiagram
+    direction TB
+    class RegistroVacuna { <<aggregate root>>
+        +aplicar() RN-03
+        +marcar_notificado()
+    }
+    class Cita { <<aggregate root>>
+        +programar()
+        +cancelar()
+        +atender()
+    }
+    class OrdenServicio { <<aggregate root>>
+        +solicitar()
+        +aprobar()
+        +completar()
+        +cancelar()
+        +puede_procesarse()
+    }
+    class ServicioCatalogo { <<aggregate root>> }
+    class LoteBiologico { <<value object>> }
+    class MarcaVacuna { <<value object>> }
+    class ProgramacionRefuerzo
+    class LineaOrden { <<value object>> }
+    RegistroVacuna *-- LoteBiologico
+    RegistroVacuna *-- MarcaVacuna
+    RegistroVacuna *-- ProgramacionRefuerzo
+    OrdenServicio *-- LineaOrden
+    RegistroVacuna ..> Paciente : paciente_id
+    Cita ..> Paciente : paciente_id
+    OrdenServicio ..> Tutor : tutor_id
+    LineaOrden ..> ServicioCatalogo : servicio_id

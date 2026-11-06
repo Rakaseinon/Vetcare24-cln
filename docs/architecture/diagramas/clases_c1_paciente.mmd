@@ -1,0 +1,24 @@
+classDiagram
+    direction TB
+    class Tutor { <<aggregate root>>
+        +registrar()
+        +asegurar_activo()
+    }
+    class Paciente { <<aggregate root>>
+        +registrar()
+        +registrar_triaje()
+        +registrar_alergia()
+        +alerta_alergia()
+        +transferir_a() RN-05
+    }
+    class MicrochipCode { <<value object>> }
+    class Peso { <<value object>> }
+    class Alergeno { <<value object>> }
+    class HojaTriaje { <<value object>> }
+    class TutorResponsable { <<value object>> }
+    Paciente *-- MicrochipCode
+    Paciente *-- Peso
+    Paciente *-- Alergeno
+    Paciente *-- HojaTriaje
+    Paciente *-- TutorResponsable
+    Paciente ..> Tutor : tutor_id
