@@ -5,8 +5,8 @@ Profesor: Miguel Ángel Gómez Marroquín · Caso 04: VetCare 24.
 
 | | |
 |---|---|
-| **Repositorio** | `https://github.com/<USUARIO>/<REPO>`  ← *reemplazar al publicar* |
-| **API desplegada (Swagger UI)** | `https://<TU-SERVICIO>.onrender.com/docs`  ← *reemplazar al desplegar* |
+| **Repositorio** | https://github.com/Rakaseinon/Vetcare24-cln |
+| **API desplegada (Swagger UI)** | https://vetcare24-api-dwsa.onrender.com/docs |
 | **Contrato OpenAPI** | [`docs/api/openapi.json`](docs/api/openapi.json) (38 rutas) |
 
 ## ¿Qué es?
