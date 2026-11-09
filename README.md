@@ -33,6 +33,14 @@ docker compose up --build            # API en http://localhost:8000/docs  (BD Po
 docker compose run --rm tests        # suite completa con cobertura mínima 80 %
 ```
 
+### Interfaz visual (`/app`)
+Además del Swagger hay una **interfaz web aparte** en `/app` (local: http://localhost:8000/app; producción: `https://vetcare24-api-dwsa.onrender.com/app`). Es una sola página HTML/JS sin dependencias (`src/api/static/app.html`) que consume esta misma API, así que respeta las mismas reglas de negocio y los mismos permisos por rol.
+
+- **Rol** en la barra superior (cabecera `X-Rol`): cambia a RECEPCION, VETERINARIO, ENFERMERIA o DIRECTOR para ver el 403 de RNF-03.
+- **Pantallas:** Inicio (KPIs), Tutores y mascotas, Consultas y urgencias, Vacunas y citas, Hospitalización (mapa de jaulas) y Órdenes de servicio.
+- **IDs encadenados:** el tutor, la mascota, la consulta, etc. que creas quedan arriba y se llenan solos en los siguientes formularios.
+- **Demostración automática** (Inicio → «Ejecutar demostración»): corre los 18 pasos del flujo completo (RN-01, RN-03, RN-04, RN-06) y marca si cada uno respondió lo esperado.
+
 ### Probar en Swagger
 `/docs` (y también la raíz `/`) abre Swagger UI **en español**, con los recursos agrupados por pasos, una guía de recorrido arriba y un ejemplo válido ya escrito en cada cuerpo.
 

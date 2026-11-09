@@ -146,14 +146,15 @@ def test_us04_triaje_actualiza_peso_y_alergias(client):
 
 
 # ---------------------------------------------------------------- US07 / US08 / RN-03 profilaxis
-def test_rn03_vacuna_exige_lote_y_marca_y_calcula_refuerzo(client):
+def test_rn03_vacuna_exige_lote_y_marca_y_calcula_refuerzo(client, reloj):
+    hoy = reloj().date()  # el reloj de prueba está fijo: no depender del día real
     pid = mascota(client, tutor(client))
-    base = {"paciente_id": pid, "nombre_vacuna": "Quíntuple", "fecha_aplicacion": date.today().isoformat()}
+    base = {"paciente_id": pid, "nombre_vacuna": "Quíntuple", "fecha_aplicacion": hoy.isoformat()}
     assert client.post("/vacunas", json=base, headers=VET).status_code == 400
     assert client.post("/vacunas", json={**base, "lote": "L1"}, headers=VET).status_code == 400
     ok = client.post("/vacunas", json={**base, "lote": "L1", "marca": "Zoetis", "esquema": "CACHORRO_28"}, headers=VET)
     assert ok.status_code == 201 and ok.json()["intervalo_dias"] == 28
-    assert date.fromisoformat(ok.json()["fecha_refuerzo"]) == date.today() + timedelta(days=28)
+    assert date.fromisoformat(ok.json()["fecha_refuerzo"]) == hoy + timedelta(days=28)
 
 
 def test_us08_recordatorio_48h_antes_se_envia_una_sola_vez(client, reloj):

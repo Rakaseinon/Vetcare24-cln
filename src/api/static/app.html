@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VetCare 24 · Sistema clínico</title>
+<style>
+:root{--verde:#0b6e99;--verde2:#0a8bb8;--tinte:#e7f4fb;--borde:#c5deec;--fondo:#f2f8fc;--txt:#1f2933;--mut:#5b6770;--amb:#c98a0b;--rojo:#b3261e;--rojo-bg:#fdecea;--ok:#1b7a3d;--ok-bg:#e3f4e8;--am-bg:#fff4d6}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--txt);background:var(--fondo)}
+a{color:var(--verde2)}
+.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+aside{background:var(--verde);color:#fff;padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+aside h1{font-size:19px;margin:0 8px 2px;letter-spacing:.2px}
+aside .lema{font-size:12px;color:#c4e3f3;margin:0 8px 18px}
+aside nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:#e6f4fb;text-decoration:none;margin-bottom:2px;font-size:14.5px}
+aside nav a b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.16);font-size:12px}
+aside nav a:hover{background:rgba(255,255,255,.1)}
+aside nav a.on{background:#fff;color:var(--verde);font-weight:600}
+aside nav a.on b{background:var(--verde);color:#fff}
+aside .pie{margin:18px 8px 0;font-size:12px;color:#c4e3f3}
+aside .pie a{color:#fff}
+main{min-width:0}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 22px;background:#fff;border-bottom:1px solid var(--borde);position:sticky;top:0;z-index:5}
+.top label{font-size:12px;color:var(--mut);display:block}
+.top select{padding:7px 10px;border:1px solid var(--borde);border-radius:8px;font:inherit;background:#fff}
+.ctx{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto;align-items:center}
+.chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--borde);background:var(--tinte);border-radius:999px;padding:3px 6px 3px 10px;font-size:12.5px;cursor:pointer}
+.chip small{color:var(--mut)} .chip code{font-size:12px} .chip i{font-style:normal;color:var(--mut);padding:0 4px;border-radius:50%} .chip i:hover{background:#fff;color:var(--rojo)}
+.page{padding:20px 22px 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,430px);gap:20px;align-items:start}
+.page.solo{grid-template-columns:minmax(0,1fr)}
+h2{margin:0 0 4px;font-size:22px;color:var(--verde)} .lead{margin:0 0 16px;color:var(--mut)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+.card{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:14px 15px}
+.card.off{opacity:.62}
+.card h3{margin:0 0 2px;font-size:16px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card .d{font-size:13px;color:var(--mut);margin:0 0 10px}
+.roles{font-size:11px;color:var(--mut);font-weight:400;white-space:nowrap}
+.card.off .roles{color:var(--rojo);font-weight:600}
+.f{display:block;margin:0 0 9px} .f span{display:block;font-size:12.5px;color:var(--mut);margin-bottom:3px} .f span em{color:var(--rojo);font-style:normal}
+.f input,.f select,.f textarea{width:100%;padding:8px 9px;border:1px solid #a8c5d6;border-radius:8px;font:inherit;background:#fff}
+.f input:focus,.f select:focus,.f textarea:focus{outline:2px solid #7fc3e3;border-color:var(--verde2)}
+.f textarea{min-height:62px;resize:vertical}
+.f.chk{display:flex;gap:8px;align-items:center} .f.chk span{margin:0;color:var(--txt)} .f.chk input{width:auto}
+.f small{display:block;color:var(--mut);font-size:11.5px;margin-top:2px}
+.f input.auto{background:var(--tinte);border-color:#9ccbe2}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--verde);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:600}
+.btn:hover{background:#095a7d} .btn:disabled{opacity:.6;cursor:wait}
+.btn.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}
+.btn.amb{background:var(--amb)}
+.res{position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:12px}
+.res h3{margin:0 0 8px;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+.res h3 button{font-size:12px;border:0;background:none;color:var(--mut)}
+.vacio{color:var(--mut);font-size:13.5px;padding:10px 4px}
+.r{border:1px solid var(--borde);border-radius:10px;margin-bottom:10px;overflow:hidden}
+.r>header{display:flex;gap:8px;align-items:center;padding:7px 10px;background:var(--tinte);font-size:13px}
+.r>header b{flex:1;font-weight:600} .r>header time{color:var(--mut);font-size:11.5px}
+.r.err>header{background:var(--rojo-bg)}
+.r .cuerpo{padding:9px 10px}
+.met{font:600 11.5px ui-monospace,Consolas,monospace;padding:2px 6px;border-radius:5px;background:#fff;border:1px solid var(--borde)}
+.st{font:700 12px ui-monospace,Consolas,monospace;padding:2px 7px;border-radius:5px}
+.st.o{background:var(--ok-bg);color:var(--ok)} .st.e{background:var(--rojo-bg);color:var(--rojo)} .st.w{background:var(--am-bg);color:#8a5a00}
+.msg{padding:8px 10px;border-radius:8px;background:var(--rojo-bg);color:#6e1410;font-size:13.5px}
+.msg b{display:block;font-size:12px;letter-spacing:.3px;text-transform:uppercase;opacity:.8}
+.msg.regla{background:var(--am-bg);color:#6b4600}
+.kv{display:grid;grid-template-columns:minmax(90px,max-content) 1fr;gap:3px 12px;font-size:13.5px;margin:0}
+.kv dt{color:var(--mut)} .kv dd{margin:0;word-break:break-word}
+.sub{border-left:3px solid var(--borde);padding-left:8px;margin:2px 0}
+.item{padding:4px 0;border-bottom:1px dashed var(--borde)} .item:last-child{border-bottom:0}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--tinte);border:1px solid var(--borde);font-size:12.5px;margin:0 3px 2px 0}
+.pill.ok{background:var(--ok-bg);border-color:#b7e0c3;color:var(--ok)} .pill.no{background:#eef0f1;color:var(--mut)}
+.pill.rojo{background:var(--rojo-bg);border-color:#f2b8b5;color:var(--rojo)} .pill.am{background:var(--am-bg);border-color:#f0d58a;color:#8a5a00}
+.mut{color:var(--mut)} .id{font:12.5px ui-monospace,Consolas,monospace;background:#edf4f8;border-radius:5px;padding:0 5px;cursor:copy}
+table.t{border-collapse:collapse;width:100%;font-size:13px} table.t th{background:var(--verde);color:#fff;text-align:left;padding:5px 7px;position:sticky;top:0} table.t td{padding:5px 7px;border-bottom:1px solid #dcebf3;vertical-align:top}
+.jaulas{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:6px}
+.jaula{border-radius:8px;padding:6px 4px;text-align:center;font:600 12px ui-monospace,Consolas,monospace;border:1px solid var(--borde);cursor:pointer}
+.jaula.libre{background:var(--ok-bg);color:var(--ok)} .jaula.ocupada{background:var(--rojo-bg);color:var(--rojo)} .jaula small{display:block;font:11px "Segoe UI",sans-serif;color:var(--mut)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:12px 14px}
+.kpi b{display:block;font-size:28px;color:var(--verde);line-height:1.1} .kpi span{font-size:13px;color:var(--mut)}
+.pasos{counter-reset:p;display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.pasos li{counter-increment:p;display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--borde);border-radius:10px;padding:9px 12px}
+.pasos li::before{content:counter(p);display:grid;place-items:center;min-width:26px;height:26px;border-radius:50%;background:var(--verde);color:#fff;font-weight:700;font-size:13px}
+.pasos li div{flex:1} .pasos li small{display:block;color:var(--mut)}
+.demo{display:grid;gap:6px;margin-top:10px}
+.demo .p{display:flex;gap:8px;align-items:center;font-size:13.5px;padding:6px 9px;border:1px solid var(--borde);border-radius:8px;background:#fff}
+.demo .p span:nth-child(2){flex:1}
+.demo .p.ok{border-color:#b7e0c3} .demo .p.mal{border-color:#f2b8b5;background:var(--rojo-bg)}
+.nota{background:var(--am-bg);border:1px solid #f0d58a;border-radius:10px;padding:10px 12px;font-size:13.5px;margin-bottom:16px}
+.toast{position:fixed;right:18px;bottom:18px;background:var(--verde);color:#fff;padding:9px 14px;border-radius:9px;font-size:13.5px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none;z-index:20}
+.toast.on{opacity:1;transform:none}
+@media(max-width:1100px){.page{grid-template-columns:minmax(0,1fr)}.res{position:static;max-height:none}}
+@media(max-width:760px){.app{grid-template-columns:1fr}aside{position:static;height:auto}aside nav{display:flex;flex-wrap:wrap;gap:4px}.ctx{margin-left:0}.top{position:static}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>VetCare 24</h1>
+    <p class="lema">Clínica y hospital veterinario 24/7</p>
+    <nav id="nav"></nav>
+    <p class="pie">API: <a href="/docs" target="_blank">Swagger</a> · <a href="/openapi.json" target="_blank">OpenAPI</a><br>Equipo 4 · FIME-UANL</p>
+  </aside>
+  <main>
+    <div class="top">
+      <div><label for="rol">Rol (X-Rol)</label>
+        <select id="rol">
+          <option>DIRECTOR</option><option>VETERINARIO</option><option>RECEPCION</option><option>ENFERMERIA</option>
+        </select></div>
+      <div class="ctx" id="ctx"></div>
+    </div>
+    <div id="vista"></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ===================== utilidades ===================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ALL = ["RECEPCION", "VETERINARIO", "ENFERMERIA", "DIRECTOR"];
+const CLIN = ["VETERINARIO", "DIRECTOR"];
+const ORD = ["RECEPCION", "VETERINARIO", "DIRECTOR"];
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d } catch { return d } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
+let rol = store.get("vc-rol", "DIRECTOR");
+let ctx = {}; try { ctx = JSON.parse(store.get("vc-ctx", "{}")) || {} } catch { ctx = {} }
+const CTX_NOMBRES = { tutor: "Tutor", paciente: "Mascota", consulta: "Consulta", estudio: "Estudio", hosp: "Hospitalización", orden: "Orden", cita: "Cita" };
+const hoy = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10) };
+const manana10 = () => { const d = new Date(Date.now() + 864e5); d.setHours(10, 0, 0, 0); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) };
+function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => e.classList.remove("on"), 1800) }
+function copiar(t) { try { navigator.clipboard.writeText(t); toast("Copiado: " + t) } catch { toast(t) } }
+
+/* ===================== API ===================== */
+async function api(metodo, ruta, cuerpo) {
+  const t0 = performance.now();
+  const op = { method: metodo, headers: { "X-Rol": rol } };
+  if (cuerpo !== undefined) { op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(cuerpo) }
+  let r, data = null;
+  try { r = await fetch(ruta, op) } catch (e) { return { status: 0, ok: false, data: { mensaje: "No se pudo conectar con la API. ¿Está encendida?" }, ms: 0 } }
+  try { data = await r.json() } catch { data = null }
+  return { status: r.status, ok: r.ok, data, ms: Math.round(performance.now() - t0) };
+}
+
+/* ===================== contexto (IDs encadenados) ===================== */
+function guardarCtx() { store.set("vc-ctx", JSON.stringify(ctx)); pintarCtx(); aplicarCtx() }
+function aprenderIds(d) {
+  if (!d || Array.isArray(d) || typeof d !== "object") return;
+  const id = d.id;
+  if (typeof id === "string") {
+    if (/^(TUT-|VET-C)/.test(id)) ctx.tutor = id;
+    else if (id.startsWith("PAC-")) ctx.paciente = id;
+    else if (id.startsWith("CON-")) { ctx.consulta = id; if (d.paciente_id) ctx.paciente = d.paciente_id }
+    else if (id.startsWith("HOS-")) ctx.hosp = id;
+    else if (id.startsWith("CIT-")) ctx.cita = id;
+    else if (/^(VET-O|ORD-)/.test(id)) ctx.orden = id;
+  }
+  if (d.hospitalizacion && d.hospitalizacion.id) ctx.hosp = d.hospitalizacion.id;
+  if (Array.isArray(d.estudios) && d.estudios.length) ctx.estudio = d.estudios[d.estudios.length - 1].id;
+  guardarCtx();
+}
+function pintarCtx() {
+  const e = $("#ctx"); const k = Object.keys(CTX_NOMBRES).filter(x => ctx[x]);
+  e.innerHTML = k.length ? '<small class="mut">En uso:</small>' + k.map(x => `<span class="chip" data-c="${x}" title="Clic para copiar"><small>${CTX_NOMBRES[x]}</small><code>${esc(ctx[x])}</code><i data-x="${x}" title="Olvidar">×</i></span>`).join("") : '<small class="mut">Los identificadores que crees se llenan solos en los formularios.</small>';
+  e.querySelectorAll(".chip").forEach(c => c.onclick = ev => { if (ev.target.dataset.x) { delete ctx[ev.target.dataset.x]; guardarCtx(); return } copiar(ctx[c.dataset.c]) });
+}
+function aplicarCtx() {
+  document.querySelectorAll("[data-ctx]").forEach(i => {
+    const v = ctx[i.dataset.ctx];
+    if (v && (!i.value || i.classList.contains("auto"))) { i.value = v; i.classList.add("auto") }
+    if (!v && i.classList.contains("auto")) { i.value = ""; i.classList.remove("auto") }
+  });
+}
+
+/* ===================== presentación de resultados ===================== */
+const ETQ = { codigo_expediente: "Expediente", tutor_id: "Tutor", paciente_id: "Mascota", consulta_id: "Consulta", jaula_id: "Jaula", es_preferente: "Tutor preferente", canal_preferido: "Canal", alerta_alergia: "Alerta de alergia", peso_kg: "Peso (kg)", fecha_nacimiento: "Nacimiento", nota: "Nota SOAP", receta: "Receta", enmiendas: "Enmiendas", triage: "Triaje", cancelacion_tardia: "Cancelación tardía", acciones_permitidas: "Acciones permitidas", duracion_min: "Duración (min)", alta_medica_firmada: "Alta médica firmada", cuenta_liquidada: "Cuenta liquidada", apto_para_egreso: "Apto para egreso", precuenta_total: "Precuenta ($)", puede_procesarse: "Puede procesarse", motivos_no_procesable: "Motivos de rechazo", elegible_beneficio_referencia: "Beneficio por referencia", tasa_ocupacion: "Ocupación", vacunas_aplicadas: "Vacunas aplicadas", ordenes_canceladas: "Órdenes canceladas", citas_canceladas: "Citas canceladas", citas_canceladas_tardias: "Cancelaciones tardías", fecha_refuerzo: "Refuerzo", fecha_aplicacion: "Aplicación", intervalo_dias: "Intervalo (días)", nombre_vacuna: "Vacuna", codigo: "Código", mensaje: "Mensaje", bitacora: "Bitácora", estudios: "Estudios de laboratorio", principio_activo: "Principio activo", identificacion_oficial: "Identificación", sha256: "SHA-256" };
+const etiqueta = k => ETQ[k] || k.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+const VERDES = /^(CONFIRMADA|REALIZADA|APROBADA|COMPLETADA|ESTABLE|VERDE|EGRESO_CONCLUIDO|EGRESADO|HOSPITALIZADO|ACTIVO)$/;
+const AMARILLOS = /^(SOLICITADA|AMARILLO|PENDIENTE.*|OBSERVACION|EN_ESPERA)$/;
+const ROJOS = /^(CANCELADA|ROJO|CRITICO|CRÍTICO|RECHAZADA)$/;
+function pill(v) { const s = String(v); const c = ROJOS.test(s) ? "rojo" : VERDES.test(s) ? "ok" : AMARILLOS.test(s) ? "am" : ""; return `<span class="pill ${c}">${esc(s)}</span>` }
+function valor(v, k) {
+  if (v === null || v === undefined || v === "") return '<span class="mut">—</span>';
+  if (typeof v === "boolean") return v ? '<span class="pill ok">Sí</span>' : '<span class="pill no">No</span>';
+  if (k === "tasa_ocupacion" && typeof v === "number") return (v * 100).toFixed(1) + " %";
+  if (Array.isArray(v)) {
+    if (!v.length) return '<span class="mut">ninguno</span>';
+    if (v.every(x => typeof x !== "object")) return v.map(x => /^[A-Z_]{4,}$/.test(x) ? pill(x) : `<span class="pill">${esc(x)}</span>`).join(" ");
+    return '<div class="sub">' + v.map(x => '<div class="item">' + kv(x) + "</div>").join("") + "</div>";
+  }
+  if (typeof v === "object") return '<div class="sub">' + kv(v) + "</div>";
+  const s = String(v);
+  if (/^(TUT|PAC|CON|VAC|CIT|HOS|LAB|ORD)-[0-9a-f]{6,}$|^VET-[CPO]\d+$|^J[PGA]-\d+$/.test(s)) return `<span class="id" data-copy="${esc(s)}">${esc(s)}</span>`;
+  if (/^[A-Z][A-Z_]{3,}$/.test(s) && !/^(PERRO|GATO|OTRO)$/.test(s)) return pill(s);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return esc(s.replace("T", " ").slice(0, 16));
+  return esc(s);
+}
+function kv(o) { return '<dl class="kv">' + Object.entries(o).map(([k, v]) => `<dt>${esc(etiqueta(k))}</dt><dd>${valor(v, k)}</dd>`).join("") + "</dl>" }
+function tabla(a) {
+  const cols = [...new Set(a.flatMap(o => Object.keys(o)))];
+  return '<div style="overflow:auto;max-height:340px"><table class="t"><tr>' + cols.map(c => `<th>${esc(etiqueta(c))}</th>`).join("") + "</tr>" +
+    a.map(o => "<tr>" + cols.map(c => `<td>${valor(o[c], c)}</td>`).join("") + "</tr>").join("") + "</table></div>";
+}
+function cuerpoResultado(data) {
+  if (Array.isArray(data)) {
+    if (!data.length) return '<div class="vacio">Sin resultados.</div>';
+    if (data.every(x => x && typeof x.libre === "boolean" && x.id)) return '<div class="jaulas">' + data.map(j => `<div class="jaula ${j.libre ? "libre" : "ocupada"}" data-copy="${esc(j.id)}" title="${j.libre ? "Libre" : "Ocupada"} · clic para copiar">${esc(j.id)}<small>${esc(j.tipo)}</small></div>`).join("") + "</div>";
+    if (data.every(x => x && typeof x === "object")) return tabla(data);
+    return valor(data);
+  }
+  if (data && typeof data === "object") return kv(data);
+  return esc(data ?? "");
+}
+function mensajeError(res) {
+  const d = res.data || {};
+  if (res.status === 0) return `<div class="msg"><b>Sin conexión</b>${esc(d.mensaje)}</div>`;
+  if (res.status === 409) return `<div class="msg regla"><b>Regla de negocio · ${esc(d.codigo || "409")}</b>${esc(d.mensaje || "")}</div>`;
+  if (res.status === 403 || res.status === 401) return `<div class="msg"><b>Acceso denegado (RNF-03)</b>${esc(d.detail || "")} Cambia el rol arriba a la izquierda.</div>`;
+  if (res.status === 404) return `<div class="msg"><b>No encontrado</b>${esc(d.mensaje || "El recurso no existe.")}</div>`;
+  if (res.status === 400) return `<div class="msg regla"><b>Regla de negocio · ${esc(d.codigo || "400")}</b>${esc(d.mensaje || "")}</div>`;
+  if (res.status === 422 && Array.isArray(d.detail)) return `<div class="msg"><b>Revisa estos datos</b>${d.detail.map(e => esc((e.loc || []).slice(1).join(".") + ": " + (e.msg || ""))).join("<br>")}</div>`;
+  return `<div class="msg"><b>Error ${res.status}</b>${esc(d.mensaje || d.detail || "")}</div>`;
+}
+const resultados = [];
+function mostrar(titulo, m, ruta, res) {
+  resultados.unshift({ titulo, m, ruta, res, hora: new Date().toLocaleTimeString("es-MX") });
+  if (resultados.length > 8) resultados.pop();
+  pintarResultados();
+}
+function pintarResultados() {
+  const e = $("#res"); if (!e) return;
+  e.innerHTML = '<h3>Resultado <button id="limpiar">Limpiar</button></h3>' + (resultados.length ? resultados.map(r => {
+    const c = r.res.ok ? "o" : ([400, 409].includes(r.res.status) ? "w" : "e");
+    return `<div class="r ${r.res.ok ? "" : "err"}"><header><span class="met">${r.m}</span><b>${esc(r.titulo)}</b><span class="st ${c}">${r.res.status || "ERR"}</span><time>${r.hora} · ${r.res.ms} ms</time></header><div class="cuerpo">${r.res.ok ? cuerpoResultado(r.res.data) : mensajeError(r.res)}</div></div>`;
+  }).join("") : '<div class="vacio">Aquí aparece la respuesta de cada acción que ejecutes.</div>');
+  const l = $("#limpiar"); if (l) l.onclick = () => { resultados.length = 0; pintarResultados() };
+}
+document.addEventListener("click", e => { const c = e.target.closest("[data-copy]"); if (c) copiar(c.dataset.copy) });
+
+/* ===================== formularios por acción ===================== */
+const F = (n, l, t = "text", o = {}) => ({ n, l, t, ...o });
+function leerCampo(f, el) {
+  if (f.t === "bool") return el.checked;
+  let v = el.value.trim(); if (v === "") return undefined;
+  if (f.t === "int") return parseInt(v, 10);
+  if (f.t === "dec") return v.replace(",", ".");
+  if (f.t === "list") return v.split(",").map(x => x.trim()).filter(Boolean);
+  if (f.t === "datetime") return v.length === 16 ? v + ":00" : v;
+  return v;
+}
+function campoHtml(a, f) {
+  const id = `${a.id}__${f.n}`; const req = f.req ? " <em>*</em>" : ""; const ctxA = f.ctx ? ` data-ctx="${f.ctx}"` : "";
+  if (f.t === "bool") return `<label class="f chk"><input type="checkbox" id="${id}" ${f.def ? "checked" : ""}><span>${f.l}</span></label>`;
+  let ctl;
+  if (f.t === "select") ctl = `<select id="${id}">${f.opts.map(o => Array.isArray(o) ? `<option value="${esc(o[0])}">${esc(o[1])}</option>` : `<option>${esc(o)}</option>`).join("")}</select>`;
+  else if (f.t === "area") ctl = `<textarea id="${id}" placeholder="${esc(f.ph || "")}">${esc(f.def || "")}</textarea>`;
+  else {
+    const tipo = f.t === "datetime" ? "datetime-local" : f.t === "date" ? "date" : "text";
+    const val = typeof f.def === "function" ? f.def() : (f.def ?? "");
+    ctl = `<input id="${id}" type="${tipo}" value="${esc(val)}" placeholder="${esc(f.ph || "")}"${ctxA} autocomplete="off">`;
+  }
+  return `<label class="f"><span>${f.l}${req}</span>${ctl}${f.h ? `<small>${f.h}</small>` : ""}</label>`;
+}
+function tarjeta(a) {
+  const permitido = a.roles.includes(rol);
+  return `<form class="card ${permitido ? "" : "off"}" data-a="${a.id}"><h3>${a.t}<span class="roles">${a.roles.length === 4 ? "todos los roles" : a.roles.map(r => r[0] + r.slice(1).toLowerCase()).join(" · ")}</span></h3><p class="d">${a.d}</p>${a.f.map(f => campoHtml(a, f)).join("")}<button class="btn" type="submit">${a.b || "Ejecutar"}</button></form>`;
+}
+async function ejecutar(a, form) {
+  const vals = {}; let ruta = a.p; const q = new URLSearchParams(); const body = {};
+  for (const f of a.f) {
+    const el = form.querySelector("#" + a.id + "__" + f.n); const v = leerCampo(f, el); vals[f.n] = v;
+    if (f.path) { if (!v) { toast("Falta: " + f.l); el.focus(); return } ruta = ruta.replace(":" + f.n, encodeURIComponent(v)) }
+    else if (f.q) { if (v !== undefined && v !== false) q.set(f.n, v) }
+    else if (v !== undefined && !(f.t === "bool" && !v && !f.send)) body[f.n] = v;
+  }
+  const faltan = a.f.filter(f => f.req && !f.path && (vals[f.n] === undefined || vals[f.n] === ""));
+  if (faltan.length && a.m !== "GET") { toast("Falta: " + faltan[0].l); form.querySelector("#" + a.id + "__" + faltan[0].n).focus(); return }
+  const url = ruta + (q.toString() ? "?" + q : "");
+  const cuerpo = a.m === "GET" ? undefined : (a.body ? a.body(vals, body) : body);
+  const btn = form.querySelector("button"); btn.disabled = true;
+  const res = await api(a.m, url, a.m === "GET" ? undefined : (a.nobody ? undefined : cuerpo));
+  btn.disabled = false;
+  mostrar(a.t, a.m, url, res);
+  if (res.ok) { aprenderIds(res.data); if (a.m !== "GET") toast("Listo: " + a.t) }
+}
+function montarAcciones(lista) {
+  const cont = $("#cards"); cont.innerHTML = lista.map(tarjeta).join("");
+  cont.querySelectorAll("form").forEach(f => {
+    const a = lista.find(x => x.id === f.dataset.a);
+    f.onsubmit = e => { e.preventDefault(); ejecutar(a, f) };
+    f.querySelectorAll("[data-ctx]").forEach(i => i.addEventListener("input", () => i.classList.remove("auto")));
+  });
+  aplicarCtx();
+}
+
+/* ===================== catálogo de acciones ===================== */
+const ESP = ["PERRO", "GATO", "OTRO"];
+const CED = { def: "1234567", h: "Cédula profesional (de prueba)" };
+const A = {
+  buscar: { id: "buscar", t: "Buscar mascota", d: "Búsqueda predictiva por nombre, expediente o microchip (US12).", roles: ALL, m: "GET", p: "/pacientes/buscar", b: "Buscar", f: [F("q", "Texto a buscar", "text", { q: 1, req: 1, ph: "Ej. Firu" })] },
+  tutor: { id: "tutor", t: "Registrar tutor", d: "Da de alta al responsable de una o más mascotas.", roles: ALL, m: "POST", p: "/tutores", f: [F("nombre", "Nombre", "text", { req: 1, ph: "Ana López" }), F("identificacion_oficial", "Identificación oficial (INE)", "text", { req: 1, ph: "INE-ABC123456" }), F("telefono", "Teléfono"), F("email", "Correo electrónico"), F("ciudad", "Ciudad"), F("canal_preferido", "Canal preferido", "select", { opts: ["CORREO", "WHATSAPP"] })] },
+  verTutor: { id: "verTutor", t: "Consultar tutor", d: "Muestra si está activo y si es preferente.", roles: ALL, m: "GET", p: "/tutores/:tutor_id", b: "Consultar", f: [F("tutor_id", "ID del tutor", "text", { path: 1, ctx: "tutor", ph: "TUT-… o VET-C012" })] },
+  mascota: { id: "mascota", t: "Registrar mascota (US01)", d: "Crea la ficha y el número de expediente. Usa el tutor que acabas de crear.", roles: ALL, m: "POST", p: "/pacientes", f: [F("tutor_id", "ID del tutor", "text", { req: 1, ctx: "tutor" }), F("nombre", "Nombre de la mascota", "text", { req: 1 }), F("especie", "Especie", "select", { opts: ESP }), F("raza", "Raza"), F("fecha_nacimiento", "Fecha de nacimiento", "date"), F("peso_kg", "Peso (kg)", "dec", { ph: "12.5" }), F("microchip", "Microchip")] },
+  verPaciente: { id: "verPaciente", t: "Ver ficha de mascota", d: "Datos generales, alergias y alerta médica.", roles: ALL, m: "GET", p: "/pacientes/:paciente_id", b: "Consultar", f: [F("paciente_id", "ID de la mascota", "text", { path: 1, ctx: "paciente" })] },
+  triaje: { id: "triaje", t: "Capturar triaje (US04)", d: "Registra signos iniciales y nivel de prioridad.", roles: ALL, m: "POST", p: "/pacientes/:paciente_id/triaje", f: [F("paciente_id", "ID de la mascota", "text", { path: 1, ctx: "paciente" }), F("peso_kg", "Peso (kg)", "dec", { req: 1, ph: "12.5" }), F("temperatura_c", "Temperatura (°C)", "dec", { req: 1, ph: "38.6" }), F("motivo", "Motivo de la visita", "text", { req: 1 }), F("alergias", "Alergias (separadas por coma)", "list", { ph: "penicilina, ibuprofeno" }), F("nivel", "Nivel de triaje", "select", { opts: ["VERDE", "AMARILLO", "ROJO"] })] },
+  alergia: { id: "alergia", t: "Registrar alergia", d: "Queda como alerta permanente y activa el bloqueo RN-04 al recetar.", roles: ["VETERINARIO", "ENFERMERIA", "DIRECTOR"], m: "POST", p: "/pacientes/:paciente_id/alergias", f: [F("paciente_id", "ID de la mascota", "text", { path: 1, ctx: "paciente" }), F("principio_activo", "Principio activo", "text", { req: 1, ph: "penicilina" })] },
+  transferir: { id: "transferir", t: "Transferir titularidad (RN-05)", d: "El historial pertenece al animal: se conserva al cambiar de tutor.", roles: ["RECEPCION", "DIRECTOR"], m: "POST", p: "/pacientes/:paciente_id/transferencia", f: [F("paciente_id", "ID de la mascota", "text", { path: 1, ctx: "paciente" }), F("nuevo_tutor_id", "ID del nuevo tutor", "text", { req: 1 })] },
+  expediente: { id: "expediente", t: "Expediente clínico", d: "Historial médico completo. Solo personal médico (RNF-03).", roles: CLIN, m: "GET", p: "/pacientes/:paciente_id/expediente", b: "Abrir expediente", f: [F("paciente_id", "ID de la mascota", "text", { path: 1, ctx: "paciente" })] },
+
+  urgencia: { id: "urgencia", t: "Admitir urgencia (US03 · RN-02)", d: "Código Rojo: ingresa sin trámites; la mascota se regulariza después.", roles: ALL, m: "POST", p: "/urgencias", f: [F("descripcion_trauma", "Descripción del trauma", "area", { req: 1, ph: "Atropellado, sangrado activo…" }), F("paciente_id", "ID de la mascota (si ya existe)", "text", { ctx: "paciente" })] },
+  regularizar: { id: "regularizar", t: "Regularizar urgencia", d: "Asocia la urgencia a una mascota registrada.", roles: ALL, m: "POST", p: "/urgencias/:consulta_id/regularizar", nobody: 1, f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" }), F("paciente_id", "ID de la mascota", "text", { q: 1, req: 1, ctx: "paciente" })] },
+  abrir: { id: "abrir", t: "Abrir consulta", d: "Inicia la consulta del día con la cédula del veterinario.", roles: CLIN, m: "POST", p: "/consultas", f: [F("paciente_id", "ID de la mascota", "text", { req: 1, ctx: "paciente" }), F("cedula_veterinario", "Cédula del veterinario", "text", { req: 1, ...CED })] },
+  verConsulta: { id: "verConsulta", t: "Ver consulta", d: "Nota, receta, enmiendas y estudios.", roles: CLIN, m: "GET", p: "/consultas/:consulta_id", b: "Consultar", f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" })] },
+  receta: { id: "receta", t: "Prescribir (US06 · RN-04)", d: "Si la mascota es alérgica al fármaco, el sistema bloquea (409). Para levantarlo, agrega justificación y cédula.", roles: CLIN, m: "POST", p: "/consultas/:consulta_id/recetas", f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" }), F("principio_activo", "Principio activo", "text", { req: 1, ph: "penicilina" }), F("dosis_mg_por_kg", "Dosis (mg/kg)", "dec", { req: 1, def: "10" }), F("via", "Vía", "select", { opts: ["oral", "intravenosa", "intramuscular", "subcutánea", "tópica"] }), F("frecuencia_horas", "Cada cuántas horas", "int", { req: 1, def: "8" }), F("duracion_dias", "Duración (días)", "int", { req: 1, def: "5" }), F("justificacion", "Justificación clínica (solo si hay alergia)", "area"), F("cedula_justificante", "Cédula que justifica", "text", { h: "Obligatoria junto con la justificación" })] },
+  nota: { id: "nota", t: "Redactar nota SOAP", d: "Subjetivo, Objetivo, Análisis y Plan. Editable hasta que se firme (RN-01).", roles: CLIN, m: "PUT", p: "/consultas/:consulta_id/nota", f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" }), F("subjetivo", "S · Subjetivo", "area", { req: 1, def: "El tutor refiere vómito desde ayer." }), F("objetivo", "O · Objetivo", "area", { req: 1, def: "T 38.6 °C, mucosas rosadas, deshidratación leve." }), F("analisis", "A · Análisis", "area", { req: 1, def: "Gastroenteritis aguda." }), F("plan", "P · Plan", "area", { req: 1, def: "Dieta blanda 48 h y control en 3 días." })] },
+  firmar: { id: "firmar", t: "Firmar y cerrar nota (US05 · RN-01)", d: "Después de firmar la nota es inmutable: solo se agregan enmiendas.", roles: CLIN, m: "POST", p: "/consultas/:consulta_id/nota/firmar", f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" }), F("cedula", "Cédula del veterinario", "text", { req: 1, ...CED })] },
+  enmienda: { id: "enmienda", t: "Anexar enmienda (US13)", d: "Corrige una nota firmada sin borrarla; queda auditado.", roles: CLIN, m: "POST", p: "/consultas/:consulta_id/enmiendas", f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" }), F("cedula", "Cédula", "text", { req: 1, ...CED }), F("motivo", "Motivo", "text", { req: 1, def: "Corrección de peso" }), F("detalle", "Detalle", "area", { req: 1, def: "El peso correcto es 12.8 kg, no 12.5 kg." })] },
+  lab: { id: "lab", t: "Solicitar estudio de laboratorio (US14)", d: "Agrega un estudio a la consulta.", roles: CLIN, m: "POST", p: "/consultas/:consulta_id/laboratorio", f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" }), F("tipo_estudio", "Tipo de estudio", "text", { req: 1, def: "Hemograma completo" })] },
+  labRes: { id: "labRes", t: "Adjuntar resultado de laboratorio", d: "Anexa el archivo y avisa al médico tratante sin editar la nota.", roles: CLIN, m: "POST", p: "/consultas/:consulta_id/laboratorio/:estudio_id/resultado", f: [F("consulta_id", "ID de la consulta", "text", { path: 1, ctx: "consulta" }), F("estudio_id", "ID del estudio", "text", { path: 1, ctx: "estudio", ph: "LAB-…" }), F("nombre_archivo", "Archivo", "text", { req: 1, def: "hemograma.pdf", h: ".pdf, .png o .jpg" }), F("sha256", "Huella SHA-256 (opcional)")] },
+
+  vacuna: { id: "vacuna", t: "Registrar vacuna (US07 · RN-03)", d: "Exige lote y marca; programa el refuerzo automáticamente.", roles: ["VETERINARIO", "ENFERMERIA", "DIRECTOR"], m: "POST", p: "/vacunas", f: [F("paciente_id", "ID de la mascota", "text", { req: 1, ctx: "paciente" }), F("nombre_vacuna", "Vacuna", "text", { req: 1, def: "Quíntuple canina" }), F("lote", "Lote", "text", { def: "L-2026-0457", h: "Si lo dejas vacío, RN-03 rechaza el registro" }), F("marca", "Marca", "text", { def: "Nobivac" }), F("fecha_aplicacion", "Fecha de aplicación", "date", { def: hoy }), F("esquema", "Esquema de refuerzo", "select", { opts: [["", "(automático)"], "CACHORRO_21", "CACHORRO_28", "ANUAL"] })] },
+  recordatorios: { id: "recordatorios", t: "Despachar recordatorios (US08)", d: "Envía los avisos de refuerzos que vencen en 48 h.", roles: ["RECEPCION", "DIRECTOR"], m: "POST", p: "/recordatorios/procesar", nobody: 1, b: "Procesar ahora", f: [] },
+  cita: { id: "cita", t: "Agendar cita (US02)", d: "Bloquea la sala por servicio; la cirugía dura 90–120 min.", roles: ORD, m: "POST", p: "/citas", f: [F("paciente_id", "ID de la mascota", "text", { req: 1, ctx: "paciente" }), F("tipo", "Servicio", "select", { opts: ["CONSULTA_GENERAL", "VACUNA", "ESPECIALIDAD", "CIRUGIA"] }), F("inicio", "Fecha y hora", "datetime", { req: 1, def: manana10 }), F("duracion_min", "Duración (solo cirugía)", "int", { ph: "90 a 120" })] },
+  citasDia: { id: "citasDia", t: "Citas de un día", d: "Agenda del día seleccionado.", roles: ORD, m: "GET", p: "/citas", b: "Ver agenda", f: [F("dia", "Día", "date", { q: 1, req: 1, def: hoy })] },
+  cancelarCita: { id: "cancelarCita", t: "Cancelar cita", d: "Libera la sala; marca cancelación tardía si faltan menos de 24 h.", roles: ORD, m: "POST", p: "/citas/:cita_id/cancelar", nobody: 1, f: [F("cita_id", "ID de la cita", "text", { path: 1, ctx: "cita" })] },
+
+  jaulas: { id: "jaulas", t: "Mapa de jaulas", d: "Verde = libre, rojo = ocupada. Clic en una jaula para copiar su ID.", roles: ALL, m: "GET", p: "/jaulas", b: "Ver jaulas", f: [F("libres", "Solo las libres", "bool", { q: 1 })] },
+  ingresar: { id: "ingresar", t: "Ingresar a hospitalización (US09)", d: "Asigna jaula (contagiosos van a aislamiento).", roles: CLIN, m: "POST", p: "/hospitalizaciones", f: [F("paciente_id", "ID de la mascota", "text", { req: 1, ctx: "paciente" }), F("jaula_id", "Jaula", "text", { req: 1, def: "JP-01", h: "JP = perro, JG = gato, JA = aislamiento" }), F("plan_fluidoterapia", "Plan de fluidoterapia", "text", { req: 1, def: "Suero Ringer 20 ml/h por 24 h" }), F("contagioso", "Enfermedad contagiosa", "bool", { send: 1 }), F("critico", "Estado crítico (lecturas cada 2 h)", "bool", { send: 1 })] },
+  verHosp: { id: "verHosp", t: "Ver hospitalización", d: "Estado, precuenta y bitácora.", roles: ALL, m: "GET", p: "/hospitalizaciones/:hid", b: "Consultar", f: [F("hid", "ID de la hospitalización", "text", { path: 1, ctx: "hosp" })] },
+  constantes: { id: "constantes", t: "Registrar constantes vitales (US10)", d: "Temperatura y frecuencias; la API valida rangos clínicos.", roles: ["ENFERMERIA", "VETERINARIO", "DIRECTOR"], m: "POST", p: "/hospitalizaciones/:hid/constantes", f: [F("hid", "ID de la hospitalización", "text", { path: 1, ctx: "hosp" }), F("temperatura_c", "Temperatura (°C)", "dec", { req: 1, def: "38.5" }), F("frecuencia_cardiaca", "Frecuencia cardiaca (lpm)", "int", { req: 1, def: "100" }), F("frecuencia_respiratoria", "Frecuencia respiratoria (rpm)", "int", { req: 1, def: "24" }), F("registrada_por", "Registrada por", "text", { req: 1, def: "enfermera.lopez" })] },
+  consumo: { id: "consumo", t: "Agregar consumo a la precuenta", d: "Cargos que se liquidan al dar el alta.", roles: ["ENFERMERIA", "VETERINARIO", "DIRECTOR"], m: "POST", p: "/hospitalizaciones/:hid/consumos", f: [F("hid", "ID de la hospitalización", "text", { path: 1, ctx: "hosp" }), F("descripcion", "Descripción", "text", { req: 1, def: "Suero Ringer 500 ml" }), F("monto", "Monto ($)", "dec", { req: 1, def: "185.00" })] },
+  alta: { id: "alta", t: "Alta médica (RN-06 · paso 1)", d: "Firma del veterinario. La jaula NO se libera hasta liquidar.", roles: CLIN, m: "POST", p: "/hospitalizaciones/:hid/alta-medica", f: [F("hid", "ID de la hospitalización", "text", { path: 1, ctx: "hosp" }), F("cedula", "Cédula del veterinario", "text", { req: 1, ...CED })] },
+  liquidar: { id: "liquidar", t: "Liquidar cuenta (RN-06 · paso 2)", d: "Recepción cobra; con ambas firmas se concluye el egreso y se libera la jaula.", roles: ["RECEPCION", "DIRECTOR"], m: "POST", p: "/hospitalizaciones/:hid/liquidacion", nobody: 1, b: "Liquidar", f: [F("hid", "ID de la hospitalización", "text", { path: 1, ctx: "hosp" })] },
+  vencidas: { id: "vencidas", t: "Lecturas vencidas", d: "Pacientes sin constantes dentro de su ventana (4 h, o 2 h si son críticos).", roles: ["ENFERMERIA", "VETERINARIO", "DIRECTOR"], m: "GET", p: "/hospitalizaciones/alertas/lecturas-vencidas", b: "Revisar alertas", f: [] },
+
+  servicios: { id: "servicios", t: "Catálogo de servicios", d: "Servicios, precio y capacidad.", roles: ORD, m: "GET", p: "/servicios", b: "Ver catálogo", f: [] },
+  orden: { id: "orden", t: "Solicitar orden de servicio", d: "Valida tutor activo, líneas y autorización (Specification).", roles: ORD, m: "POST", p: "/ordenes", f: [F("tutor_id", "ID del tutor", "text", { req: 1, ctx: "tutor", ph: "VET-C012", h: "El paquete de datos trae tutores VET-C001… VET-C040" }), F("servicio_id", "ID del servicio", "text", { req: 1, def: "VET-P001" }), F("cantidad", "Cantidad", "int", { req: 1, def: "2" }), F("promocion_activa", "Promoción activa", "bool", { send: 1 }), F("autorizado", "Autorizada", "bool", { def: 1, send: 1 }), F("referencia", "Referencia (opcional)")], body: (v, b) => ({ tutor_id: b.tutor_id, lineas: [{ servicio_id: v.servicio_id, cantidad: v.cantidad }], promocion_activa: !!v.promocion_activa, autorizado: !!v.autorizado, ...(v.referencia ? { referencia: v.referencia } : {}) }) },
+  verOrden: { id: "verOrden", t: "Ver orden", d: "Total, si puede procesarse y qué acciones permite su estado.", roles: ORD, m: "GET", p: "/ordenes/:orden_id", b: "Consultar", f: [F("orden_id", "ID de la orden", "text", { path: 1, ctx: "orden", ph: "VET-O001" })] },
+  transicion: { id: "transicion", t: "Cambiar estado (State Machine)", d: "Una transición inválida (p. ej. completar una orden SOLICITADA) responde 409.", roles: ORD, m: "POST", p: "/ordenes/:orden_id/transiciones", f: [F("orden_id", "ID de la orden", "text", { path: 1, ctx: "orden", ph: "VET-O001" }), F("accion", "Acción", "select", { opts: ["aprobar", "completar", "cancelar"] })] },
+};
+const PAGINAS = [
+  { id: "inicio", n: "Inicio", ic: "⌂" },
+  { id: "pacientes", n: "Tutores y mascotas", ic: "1", t: "Tutores y mascotas", d: "Registra al responsable y a su mascota, captura el triaje y consulta fichas.", a: ["buscar", "tutor", "mascota", "verPaciente", "verTutor", "triaje", "alergia", "transferir", "expediente"] },
+  { id: "consultas", n: "Consultas y urgencias", ic: "2", t: "Consultas, recetas y urgencias", d: "Flujo clínico: abrir consulta → nota SOAP → receta → firma → enmienda.", a: ["urgencia", "regularizar", "abrir", "nota", "receta", "firmar", "enmienda", "lab", "labRes", "verConsulta"] },
+  { id: "vacunas", n: "Vacunas y citas", ic: "3", t: "Vacunas, recordatorios y citas", d: "Registro de biológicos con lote y marca, y agenda por servicio.", a: ["vacuna", "recordatorios", "cita", "citasDia", "cancelarCita"] },
+  { id: "hospital", n: "Hospitalización", ic: "4", t: "Hospitalización", d: "Jaulas, constantes vitales, precuenta y alta en dos firmas (RN-06).", a: ["jaulas", "ingresar", "verHosp", "constantes", "consumo", "alta", "liquidar", "vencidas"] },
+  { id: "ordenes", n: "Órdenes de servicio", ic: "5", t: "Órdenes de servicio", d: "Paquete de datos del curso: Specification y máquina de estados.", a: ["servicios", "orden", "verOrden", "transicion"] },
+];
+
+/* ===================== vistas ===================== */
+function nav() {
+  const h = (location.hash || "#/inicio").slice(2) || "inicio";
+  $("#nav").innerHTML = PAGINAS.map(p => `<a href="#/${p.id}" class="${p.id === h ? "on" : ""}"><b>${p.ic}</b>${p.n}</a>`).join("");
+  return h;
+}
+function vista() {
+  const id = nav(); const p = PAGINAS.find(x => x.id === id) || PAGINAS[0];
+  window.scrollTo(0, 0);
+  if (p.id === "inicio") return inicio();
+  $("#vista").innerHTML = `<div class="page"><section><h2>${p.t}</h2><p class="lead">${p.d}</p><div class="cards" id="cards"></div></section><div class="res" id="res"></div></div>`;
+  montarAcciones(p.a.map(k => A[k])); pintarResultados();
+}
+
+/* ---- inicio: KPIs, recorrido y demostración automática ---- */
+function inicio() {
+  $("#vista").innerHTML = `<div class="page"><section>
+    <h2>Panel de la clínica</h2><p class="lead">Interfaz visual de VetCare 24: usa la misma API que el Swagger, con las mismas reglas de negocio y los mismos permisos por rol.</p>
+    <div class="kpis" id="kpis"></div>
+    <h2 style="font-size:18px">Recorrido sugerido para la demostración</h2>
+    <ol class="pasos">
+      <li><div><b>Tutor y mascota</b><small>Registra a Ana López y a Firulais; los IDs se llenan solos.</small></div><a class="btn sec" href="#/pacientes">Abrir</a></li>
+      <li><div><b>Alergia + consulta + receta bloqueada (RN-04)</b><small>Registra «penicilina», abre consulta y receta penicilina → 409. Repite con justificación y cédula → 201.</small></div><a class="btn sec" href="#/consultas">Abrir</a></li>
+      <li><div><b>Nota firmada e inmutable (RN-01)</b><small>Redacta, firma, intenta editar → 409; anexa una enmienda → 201.</small></div><a class="btn sec" href="#/consultas">Abrir</a></li>
+      <li><div><b>Vacuna con lote y marca (RN-03)</b><small>Sin lote la API rechaza el registro.</small></div><a class="btn sec" href="#/vacunas">Abrir</a></li>
+      <li><div><b>Hospitalización y alta en dos firmas (RN-06)</b><small>Alta médica → pendiente; liquidación → jaula libre.</small></div><a class="btn sec" href="#/hospital">Abrir</a></li>
+      <li><div><b>Orden VET-O001 del paquete de datos</b><small>Specification + máquina de estados: completar desde SOLICITADA → 409.</small></div><a class="btn sec" href="#/ordenes">Abrir</a></li>
+    </ol>
+  </section>
+  <div class="res" style="position:static;max-height:none">
+    <h3>Demostración automática</h3>
+    <p class="d" style="font-size:13.5px;color:var(--mut);margin:0 0 10px">Ejecuta de corrido el flujo completo contra la API y marca si cada paso respondió lo esperado. Crea datos nuevos de prueba cada vez.</p>
+    <button class="btn amb" id="demo">▶ Ejecutar demostración</button>
+    <div class="demo" id="demolog"></div>
+  </div></div>`;
+  $("#demo").onclick = demoAutomatica; kpis();
+}
+async function kpis() {
+  const hoyS = hoy(); const e = $("#kpis"); if (!e) return;
+  const [jaulas, citas, venc, rep] = await Promise.all([api("GET", "/jaulas"), api("GET", "/citas?dia=" + hoyS), api("GET", "/hospitalizaciones/alertas/lecturas-vencidas"), api("GET", "/reportes/operativo")]);
+  const t = (v, l) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`; const na = '<span style="font-size:15px" class="mut">sin acceso</span>';
+  if (!$("#kpis")) return;
+  $("#kpis").innerHTML =
+    t(jaulas.ok ? `${jaulas.data.filter(j => j.libre).length}<small style="font-size:15px;color:var(--mut)"> / ${jaulas.data.length}</small>` : na, "Jaulas libres") +
+    t(citas.ok ? citas.data.length : na, "Citas de hoy") +
+    t(venc.ok ? venc.data.length : na, "Lecturas vencidas") +
+    t(rep.ok ? (rep.data.tasa_ocupacion * 100).toFixed(0) + " %" : na, "Ocupación (Director)") +
+    t(rep.ok ? rep.data.vacunas_aplicadas : na, "Vacunas aplicadas (Director)");
+}
+async function demoAutomatica() {
+  const btn = $("#demo"), log = $("#demolog"); btn.disabled = true; log.innerHTML = "";
+  const prev = rol; rol = "DIRECTOR"; $("#rol").value = rol;
+  const c = {}; const sfx = Math.random().toString(36).slice(2, 7).toUpperCase();
+  const pasos = [
+    ["Registrar tutor", 201, () => api("POST", "/tutores", { nombre: "Ana López (demo)", identificacion_oficial: "INE-DEMO-" + sfx, telefono: "8112345678", canal_preferido: "WHATSAPP" }), d => c.tutor = d.id],
+    ["Registrar mascota (US01)", 201, () => api("POST", "/pacientes", { tutor_id: c.tutor, nombre: "Firulais", especie: "PERRO", peso_kg: "12.5" }), d => c.pac = d.id],
+    ["Registrar alergia a penicilina", 201, () => api("POST", `/pacientes/${c.pac}/alergias`, { principio_activo: "penicilina" })],
+    ["Abrir consulta", 201, () => api("POST", "/consultas", { paciente_id: c.pac, cedula_veterinario: "1234567" }), d => c.con = d.id],
+    ["Recetar penicilina → bloqueo RN-04", 409, () => api("POST", `/consultas/${c.con}/recetas`, { principio_activo: "penicilina", dosis_mg_por_kg: "10", via: "oral", frecuencia_horas: 8, duracion_dias: 5 })],
+    ["Recetar con justificación y cédula (ADR-002)", 201, () => api("POST", `/consultas/${c.con}/recetas`, { principio_activo: "penicilina", dosis_mg_por_kg: "10", via: "oral", frecuencia_horas: 8, duracion_dias: 5, justificacion: "Sin alternativa eficaz; se vigila al paciente.", cedula_justificante: "1234567" })],
+    ["Redactar nota SOAP", 200, () => api("PUT", `/consultas/${c.con}/nota`, { subjetivo: "Vómito desde ayer.", objetivo: "T 38.6 °C.", analisis: "Gastroenteritis aguda.", plan: "Dieta blanda 48 h." })],
+    ["Firmar nota (RN-01)", 200, () => api("POST", `/consultas/${c.con}/nota/firmar`, { cedula: "1234567" })],
+    ["Editar nota firmada → 409 RN-01", 409, () => api("PUT", `/consultas/${c.con}/nota`, { subjetivo: "x", objetivo: "x", analisis: "x", plan: "x" })],
+    ["Anexar enmienda (US13)", 201, () => api("POST", `/consultas/${c.con}/enmiendas`, { cedula: "1234567", motivo: "Corrección de peso", detalle: "El peso correcto es 12.8 kg." })],
+    ["Vacuna sin lote → rechazo RN-03 (400)", 400, () => api("POST", "/vacunas", { paciente_id: c.pac, nombre_vacuna: "Quíntuple canina", marca: "Nobivac" })],
+    ["Vacuna con lote y marca", 201, () => api("POST", "/vacunas", { paciente_id: c.pac, nombre_vacuna: "Quíntuple canina", lote: "L-2026-0457", marca: "Nobivac" })],
+    ["Buscar jaula libre de perro", 200, async () => { const r = await api("GET", "/jaulas?libres=true"); const j = r.ok && r.data.find(x => x.tipo === "PERRO"); c.jaula = j && j.id; return r }],
+    ["Ingresar a hospitalización (US09)", 201, () => api("POST", "/hospitalizaciones", { paciente_id: c.pac, jaula_id: c.jaula, plan_fluidoterapia: "Suero Ringer 20 ml/h por 24 h" }), d => c.hos = d.id],
+    ["Registrar constantes vitales (US10)", 201, () => api("POST", `/hospitalizaciones/${c.hos}/constantes`, { temperatura_c: "38.5", frecuencia_cardiaca: 100, frecuencia_respiratoria: 24, registrada_por: "enfermera.lopez" })],
+    ["Agregar consumo a la precuenta", 201, () => api("POST", `/hospitalizaciones/${c.hos}/consumos`, { descripcion: "Suero Ringer 500 ml", monto: "185.00" })],
+    ["Alta médica → pendiente (RN-06)", 200, () => api("POST", `/hospitalizaciones/${c.hos}/alta-medica`, { cedula: "1234567" })],
+    ["Liquidar cuenta → egreso concluido", 200, () => api("POST", `/hospitalizaciones/${c.hos}/liquidacion`)],
+  ];
+  const filas = pasos.map(p => { const d = document.createElement("div"); d.className = "p"; d.innerHTML = `<span>○</span><span>${esc(p[0])}</span><span class="st w">…</span>`; log.appendChild(d); return d });
+  let bien = 0;
+  for (let i = 0; i < pasos.length; i++) {
+    const [, esperado, fn, guarda] = pasos[i];
+    const r = await fn(); const ok = r.status === esperado;
+    if (ok) bien++;
+    if (r.ok && guarda) try { guarda(r.data) } catch { }
+    if (r.ok) aprenderIds(r.data);
+    filas[i].className = "p " + (ok ? "ok" : "mal");
+    filas[i].innerHTML = `<span>${ok ? "✓" : "✗"}</span><span>${esc(pasos[i][0])}${ok ? "" : ` <small class="mut">(esperaba ${esperado})</small>`}</span><span class="st ${ok ? (esperado >= 400 ? "w" : "o") : "e"}">${r.status || "ERR"}</span>`;
+    if (!r.ok && esperado !== r.status) { mostrar(pasos[i][0], "—", "", r); }
+  }
+  log.insertAdjacentHTML("beforeend", `<div class="nota" style="margin:8px 0 0"><b>${bien} de ${pasos.length}</b> pasos respondieron lo esperado. Los 409 y 400 esperados son reglas de negocio funcionando, no errores.${bien === pasos.length ? " Los IDs creados quedaron seleccionados arriba para seguir explorando." : ""}</div>`);
+  btn.disabled = false; rol = prev; $("#rol").value = rol; kpis();
+}
+
+/* ===================== arranque ===================== */
+$("#rol").value = ROLES_OK(rol);
+function ROLES_OK(r) { return ALL.includes(r) ? r : "DIRECTOR" }
+$("#rol").onchange = e => { rol = e.target.value; store.set("vc-rol", rol); vista(); toast("Ahora actúas como " + rol) };
+window.addEventListener("hashchange", vista);
+pintarCtx(); vista();
+</script>
+</body>
+</html>

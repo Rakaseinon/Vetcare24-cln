@@ -76,4 +76,7 @@ def test_pagina_docs_precarga_el_rol_y_la_raiz_redirige(client):
     assert "form-vc" in html and "Llena el formulario" in html  # formulario: un cuadro por dato
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 307 and r.headers["location"] == "/docs"
+    app = client.get("/app")  # interfaz visual aparte del Swagger
+    assert app.status_code == 200 and app.headers["content-type"].startswith("text/html")
+    assert "VetCare 24" in app.text and "X-Rol" in app.text and "/openapi.json" in app.text
 
